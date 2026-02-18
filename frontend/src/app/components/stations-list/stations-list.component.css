@@ -1,0 +1,131 @@
+.stations-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 0.5rem;
+}
+
+.subtitle {
+  color: #6b7280;
+  margin: 0;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem;
+  color: #6b7280;
+}
+
+.error-card {
+  max-width: 400px;
+  margin: 2rem auto;
+  text-align: center;
+}
+
+.error-card mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1rem;
+}
+
+.error-card p {
+  margin: 0 0 1rem;
+  color: #dc2626;
+}
+
+.station-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.stations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.station-card {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.station-card:hover {
+  transform: translateY(-4px);
+}
+
+.station-icon {
+  vertical-align: middle;
+  margin-right: 0.5rem;
+  color: #3f51b5;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.status-badge.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.address {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin: 0 0 0.25rem;
+}
+
+.address mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #9ca3af;
+}
+
+.country {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.view-detail {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #3f51b5;
+}
+
+mat-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 16px 16px !important;
+}
+
+mat-card-actions mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #3f51b5;
+}

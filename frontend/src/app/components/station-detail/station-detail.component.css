@@ -1,0 +1,98 @@
+.detail-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.back-button {
+  margin-bottom: 1.5rem;
+}
+
+.back-button mat-icon {
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem;
+  color: #6b7280;
+}
+
+.error-card {
+  max-width: 400px;
+  margin: 2rem auto;
+  text-align: center;
+}
+
+.error-card mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 1rem;
+}
+
+.error-card p {
+  margin: 0;
+  color: #dc2626;
+}
+
+.station-detail {
+  padding: 1.5rem;
+}
+
+.station-icon {
+  vertical-align: middle;
+  margin-right: 0.5rem;
+  color: #3f51b5;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.status-badge.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.address {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  color: #4b5563;
+  margin: 0 0 0.5rem;
+}
+
+.address mat-icon {
+  color: #9ca3af;
+}
+
+.location {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin: 0 0 1rem;
+}
+
+.map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.map-link mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}

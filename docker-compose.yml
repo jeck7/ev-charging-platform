@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ev_charging
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  station-management:
+    build: ./services/station-management
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ev_charging
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      # SSL/TLS configuration for Docker
+      SERVER_SSL_KEY_STORE: file:/app/keystore/station-management.p12
+      SERVER_SSL_KEY_STORE_PASSWORD: changeit
+      SERVER_SSL_TRUST_STORE: file:/app/keystore/truststore.jks
+      SERVER_SSL_TRUST_STORE_PASSWORD: changeit
+    volumes:
+      # Mount certificates for SSL/TLS
+      - ./certs/server/station-management.p12:/app/keystore/station-management.p12:ro
+      - ./certs/truststore.jks:/app/keystore/truststore.jks:ro
+    networks:
+      - backend-network
+
+  charging-sessions:
+    build: ./services/charging-sessions
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ev_charging
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      # SSL/TLS configuration for Docker
+      SERVER_SSL_KEY_STORE: file:/app/keystore/charging-sessions.p12
+      SERVER_SSL_KEY_STORE_PASSWORD: changeit
+      SERVER_SSL_TRUST_STORE: file:/app/keystore/truststore.jks
+      SERVER_SSL_TRUST_STORE_PASSWORD: changeit
+    volumes:
+      # Mount certificates for SSL/TLS
+      - ./certs/server/charging-sessions.p12:/app/keystore/charging-sessions.p12:ro
+      - ./certs/truststore.jks:/app/keystore/truststore.jks:ro
+    networks:
+      - backend-network
+
+  api-gateway:
+    build: ./gateway
+    ports:
+      - "80:80"
+      - "8443:443"
+    depends_on:
+      - station-management
+      - charging-sessions
+    volumes:
+      # SSL certificates for nginx gateway
+      - ./certs/nginx/server-cert.pem:/etc/nginx/ssl/server-cert.pem:ro
+      - ./certs/nginx/server-key.pem:/etc/nginx/ssl/server-key.pem:ro
+      - ./certs/ca/ca-cert.pem:/etc/nginx/ssl/ca-cert.pem:ro
+      # Client certificate for backend communication (mTLS)
+      - ./certs/client/api-gateway-cert.pem:/etc/nginx/ssl/client-cert.pem:ro
+      - ./certs/client/api-gateway-key.pem:/etc/nginx/ssl/client-key.pem:ro
+      # Angular frontend build (optional - can be built separately)
+      - ./frontend/dist/frontend:/usr/share/nginx/html:ro
+    networks:
+      - backend-network
+
+volumes:
+  postgres_data:
+
+networks:
+  backend-network:
+    driver: bridge

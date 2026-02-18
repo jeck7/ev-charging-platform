@@ -1,0 +1,16 @@
+<div class="app">
+  <mat-toolbar color="primary" class="navbar">
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="logo">
+      <mat-icon>ev_station</mat-icon>
+      eMobility EV Charging
+    </a>
+    <span class="nav-spacer"></span>
+    <span class="nav-subtitle">Driver Portal</span>
+  </mat-toolbar>
+  <main class="main">
+    <router-outlet></router-outlet>
+  </main>
+  <footer class="footer">
+    <p>eMobility EV Charging Platform &copy; 2025</p>
+  </footer>
+</div>

@@ -1,0 +1,54 @@
+<div class="detail-container">
+  <button mat-stroked-button routerLink="/" class="back-button">
+    <mat-icon>arrow_back</mat-icon>
+    Back to stations
+  </button>
+
+  @if (loading) {
+    <div class="loading">
+      <mat-spinner diameter="40"></mat-spinner>
+      <span>Loading...</span>
+    </div>
+  } @else if (error || !station) {
+    <mat-card class="error-card">
+      <mat-card-content>
+        <mat-icon color="warn">error_outline</mat-icon>
+        <p>{{ error || 'Station not found' }}</p>
+      </mat-card-content>
+    </mat-card>
+  } @else {
+    <mat-card class="station-detail">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon class="station-icon">ev_station</mat-icon>
+          {{ station.name }}
+        </mat-card-title>
+        <mat-card-subtitle>
+          <span class="status-badge" [class.active]="station.status === 'ACTIVE'">
+            {{ station.status }}
+          </span>
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="address">
+          <mat-icon>location_on</mat-icon>
+          {{ station.address }}, {{ station.city }}
+        </p>
+        <p class="location">{{ station.country }}</p>
+        @if (station.latitude && station.longitude) {
+          <a
+            mat-raised-button
+            color="primary"
+            [href]="'https://maps.google.com/?q=' + station.latitude + ',' + station.longitude"
+            target="_blank"
+            rel="noopener"
+            class="map-link"
+          >
+            <mat-icon>map</mat-icon>
+            View on map
+          </a>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

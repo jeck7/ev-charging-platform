@@ -1,0 +1,41 @@
+# Certificates and keys (should not be committed)
+certs/
+*.pem
+*.key
+*.p12
+*.jks
+*.csr
+*.srl
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Build artifacts
+target/
+node_modules/
+dist/
+*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Certificates and keys (should not be committed)
+certs/
+*.pem
+*.key
+*.p12
+*.jks
+*.csr
+*.srl
