@@ -9,10 +9,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.UnknownHostException;
 import java.util.*;
 
 /**
@@ -26,6 +28,10 @@ public class ChargepriceService {
 
     @Value("${chargeprice.api.base-url:}")
     private String baseUrl;
+
+    /** Optional path prefix before /v1/... (e.g. /api when base is insights.chargeprice.app). */
+    @Value("${chargeprice.api.path-prefix:}")
+    private String pathPrefix;
 
     @Value("${chargeprice.api.key:}")
     private String apiKey;
@@ -41,6 +47,10 @@ public class ChargepriceService {
         return baseUrl != null && !baseUrl.isBlank() && apiKey != null && !apiKey.isBlank();
     }
 
+    private String getEffectiveBaseUrl() {
+        return baseUrl != null ? baseUrl.replaceAll("/$", "") : "";
+    }
+
     /**
      * Fetch charging stations from Chargeprice for a country (e.g. BG).
      */
@@ -52,18 +62,28 @@ public class ChargepriceService {
         List<ChargepriceStationDto> all = new ArrayList<>();
         int page = 1;
         try {
+            String base = getEffectiveBaseUrl();
+            String prefix = (pathPrefix != null && !pathPrefix.isBlank()) ? pathPrefix.replaceAll("^/", "").replaceAll("/$", "") : "";
+            String path = prefix.isEmpty() ? "v1" : prefix + "/v1";
             do {
-                String url = String.format("%s/v1/charging_stations?filter[country]=%s&page[size]=%d&page[number]=%d",
-                        baseUrl.replaceAll("/$", ""), countryCode.toUpperCase(), PAGE_SIZE, page);
+                String url = String.format("%s/%s/charging_stations?filter[country]=%s&page[size]=%d&page[number]=%d",
+                        base, path, countryCode.toUpperCase(), PAGE_SIZE, page);
+                log.debug("Chargeprice request: {} (page {})", url.replace(apiKey, "***"), page);
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
                 headers.set("Api-Key", apiKey);
                 ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
                 if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                    log.warn("Chargeprice stations response not OK: {}", response.getStatusCode());
+                    log.warn("Chargeprice stations response not OK: {} body start: {}", response.getStatusCode(), truncate(response.getBody(), 200));
                     break;
                 }
-                JsonNode root = objectMapper.readTree(response.getBody());
+                String body = response.getBody();
+                if (isHtmlResponse(body)) {
+                    log.warn("Chargeprice API returned HTML (demo may be web-only). Use the URL from Chargeprice as base-url; ask them for REST API access if needed.");
+                    break;
+                }
+                JsonNode root = objectMapper.readTree(body);
                 List<ChargepriceStationDto> pageStations = parseStationsResponse(root);
                 all.addAll(pageStations);
                 boolean more = root.has("meta") && root.get("meta").has("more_available")
@@ -73,6 +93,13 @@ public class ChargepriceService {
                 Thread.sleep(300); // avoid rate limit
             } while (true);
             log.info("Fetched {} stations from Chargeprice for country {}", all.size(), countryCode);
+        } catch (ResourceAccessException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof UnknownHostException) {
+                log.warn("Chargeprice host unreachable (UnknownHostException). Check base-url in config or network. {}", cause.getMessage());
+            } else {
+                log.warn("Chargeprice request failed (network/IO): {}", e.getMessage());
+            }
         } catch (Exception e) {
             log.error("Error fetching Chargeprice stations for {}", countryCode, e);
         }
@@ -90,7 +117,10 @@ public class ChargepriceService {
         int energyKwh = 30;
         try {
             Map<String, Object> payload = buildChargePriceRequest(lat, lng, country, operatorId, chargePoints, energyKwh);
-            String url = baseUrl.replaceAll("/$", "") + "/v1/charge_prices";
+            String base = getEffectiveBaseUrl();
+            String prefix = (pathPrefix != null && !pathPrefix.isBlank()) ? pathPrefix.replaceAll("^/", "").replaceAll("/$", "") : "";
+            String path = prefix.isEmpty() ? "v1" : prefix + "/v1";
+            String url = base + "/" + path + "/charge_prices";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("Api-Key", apiKey);
@@ -99,8 +129,18 @@ public class ChargepriceService {
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
                 return Optional.empty();
             }
-            JsonNode root = objectMapper.readTree(response.getBody());
+            String body = response.getBody();
+            if (isHtmlResponse(body)) {
+                log.debug("Chargeprice charge_prices returned HTML, skipping");
+                return Optional.empty();
+            }
+            JsonNode root = objectMapper.readTree(body);
             return parsePricePerKwh(root, energyKwh);
+        } catch (ResourceAccessException e) {
+            if (e.getCause() instanceof UnknownHostException) {
+                log.debug("Chargeprice host unreachable: {}", e.getCause().getMessage());
+            }
+            return Optional.empty();
         } catch (Exception e) {
             log.debug("Chargeprice price request failed for {}: {}", operatorId, e.getMessage());
             return Optional.empty();
@@ -135,6 +175,16 @@ public class ChargepriceService {
         }
         log.info("Enriched {} stations with Chargeprice prices for {}", updated, countryCode);
         return updated;
+    }
+
+    private static boolean isHtmlResponse(String body) {
+        if (body == null || body.isBlank()) return false;
+        return body.stripLeading().startsWith("<");
+    }
+
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return "null";
+        return s.length() <= maxLen ? s : s.substring(0, maxLen) + "...";
     }
 
     private Optional<ChargepriceStationDto> findNearestChargepriceStation(List<ChargepriceStationDto> stations, double lat, double lng) {
