@@ -47,6 +47,26 @@ export class StationImportService {
   }
 
   /**
+   * Start import of Fines Charging stations for Bulgaria from Open Charge Map (by operator).
+   */
+  importFinesStations(): Observable<{ jobId: string; country: string; operator: string; status: string; message: string }> {
+    return this.http.post<{ jobId: string; country: string; operator: string; status: string; message: string }>(
+      `${this.apiUrl}/import/fines`,
+      {}
+    );
+  }
+
+  /**
+   * Скрапиране на finescharging.com/locations и импорт в БД. Изисква Node + Playwright в tools/fines-scraper.
+   */
+  importFinesScrape(): Observable<{ success: boolean; imported?: number; updated?: number; total?: number; message?: string; error?: string }> {
+    return this.http.post<{ success: boolean; imported?: number; updated?: number; total?: number; message?: string; error?: string }>(
+      `${this.apiUrl}/import/fines-scrape`,
+      {}
+    );
+  }
+
+  /**
    * Get import job status
    */
   getImportStatus(jobId: string): Observable<ImportJobStatus> {

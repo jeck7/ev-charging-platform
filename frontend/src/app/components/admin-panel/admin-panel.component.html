@@ -55,6 +55,29 @@
             <mat-icon>cloud_download</mat-icon>
             {{ isImporting ? 'Импортиране...' : 'Стартирай Импорт' }}
           </button>
+          <button
+            mat-stroked-button
+            (click)="startImportFines()"
+            [disabled]="isImporting"
+            title="Импорт само на станции на Fines Charging за БГ от Open Charge Map"
+          >
+            <mat-icon>ev_station</mat-icon>
+            Импорт Fines (от OCM)
+          </button>
+          <button
+            mat-stroked-button
+            (click)="startImportFinesScrape()"
+            [disabled]="isFinesScraping"
+            title="Скрапиране на finescharging.com/locations и импорт в БД (изисква Node + Playwright)"
+          >
+            <mat-icon>link</mat-icon>
+            Fines (скрапинг)
+          </button>
+        </div>
+
+        <div class="fines-scrape-result" *ngIf="finesScrapeResult">
+          <span *ngIf="finesScrapeResult.success">Скрапинг: импортирани {{ finesScrapeResult.imported }}, актуализирани {{ finesScrapeResult.updated }} (общо {{ finesScrapeResult.total }})</span>
+          <span *ngIf="!finesScrapeResult.success" class="error">{{ finesScrapeResult.error }}</span>
         </div>
 
         <!-- Import Status -->

@@ -28,7 +28,8 @@ import java.util.Objects;
 public class OpenChargeMapService {
 
     private static final String OPEN_CHARGE_MAP_API_URL = "https://api.openchargemap.io/v3/poi/";
-    
+    private static final String OPEN_CHARGE_MAP_REFERENCE_URL = "https://api.openchargemap.io/v3/referencedata/";
+
     @Value("${openchargemap.api.key:}")
     private String apiKey;
     
@@ -114,21 +115,27 @@ public class OpenChargeMapService {
         }
     }
 
-    /** Page size for paginated import (OCM recommends 1000–2000 per request). */
-    private static final int IMPORT_PAGE_SIZE = 2000;
+    /** Page size for paginated import (OCM often caps at 1000 per request; use 1000 for reliability). */
+    private static final int IMPORT_PAGE_SIZE = 1000;
     /** Pause between pages to avoid rate limiting (ms). */
     private static final int IMPORT_PAGE_DELAY_MS = 400;
+    /** Max pages per import to avoid infinite loop if API misbehaves. */
+    private static final int IMPORT_MAX_PAGES = 200;
 
     /**
      * Build URL for one page of import: country + sortby=id_asc + greaterthanid for pagination.
+     * If operatorId is not null, filter by operator (e.g. Fines Charging).
      */
-    private String buildImportPageUrl(String countryCode, long greaterThanId) {
+    private String buildImportPageUrl(String countryCode, long greaterThanId, Integer operatorId) {
         String params = String.format(
-            "output=json&countrycode=%s&maxresults=%d&sortby=id_asc&compact=true&verbose=false",
+            "output=json&countrycode=%s&maxresults=%d&sortby=id_asc",
             countryCode, IMPORT_PAGE_SIZE
         );
         if (greaterThanId > 0) {
             params += "&greaterthanid=" + greaterThanId;
+        }
+        if (operatorId != null) {
+            params += "&operatorid=" + operatorId;
         }
         String baseUrl = OPEN_CHARGE_MAP_API_URL + "?" + params;
         if (apiKey != null && !apiKey.trim().isEmpty()) {
@@ -138,13 +145,42 @@ public class OpenChargeMapService {
     }
 
     /**
-     * Import all stations from Open Charge Map for a country into local database.
-     * Uses pagination (sortby=id_asc, greaterthanid) so we load every station, not just the first 10k.
+     * Resolve Open Charge Map operator ID by name (e.g. "Fines" -> ID).
+     * Uses reference data: https://api.openchargemap.io/v3/referencedata/
+     */
+    public Integer findOperatorIdByTitle(String titleSubstring) {
+        try {
+            String url = OPEN_CHARGE_MAP_REFERENCE_URL + (apiKey != null && !apiKey.trim().isEmpty() ? "?key=" + apiKey : "");
+            String response = restTemplate.getForObject(url, String.class);
+            if (response == null || response.isBlank()) return null;
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode operators = root.has("Operators") ? root.get("Operators") : null;
+            if (operators == null || !operators.isArray()) return null;
+            String search = titleSubstring.trim().toLowerCase();
+            for (JsonNode op : operators) {
+                if (op.has("Title")) {
+                    String title = op.get("Title").asText("");
+                    if (title.toLowerCase().contains(search) && op.has("ID")) {
+                        return op.get("ID").asInt();
+                    }
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            log.warn("Could not fetch OCM reference data for operator '{}': {}", titleSubstring, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Import all stations from Open Charge Map for a country (optionally filtered by operator).
+     * Uses pagination (sortby=id_asc, greaterthanid) so we load every station.
      *
      * @param countryCode Country code (e.g., "BG" for Bulgaria)
+     * @param operatorId   Optional OCM operator ID (e.g. Fines). If null, import all for country.
      * @return Import result with counts
      */
-    public ImportResult importStationsFromOpenChargeMap(String countryCode) {
+    public ImportResult importStationsFromOpenChargeMap(String countryCode, Integer operatorId) {
         int imported = 0;
         int updated = 0;
         int skipped = 0;
@@ -158,16 +194,20 @@ public class OpenChargeMapService {
         }
 
         try {
-            log.info("Importing stations from Open Charge Map for country: {} (paginated, page size {})", countryCode, IMPORT_PAGE_SIZE);
+            log.info("Importing stations from Open Charge Map for country: {} (operatorId={}, page size {})", countryCode, operatorId, IMPORT_PAGE_SIZE);
 
             while (true) {
                 pageNum++;
-                String url = buildImportPageUrl(countryCode, lastId);
+                String url = buildImportPageUrl(countryCode, lastId, operatorId);
                 log.info("Fetching page {} (greaterthanid={})", pageNum, lastId);
 
                 String response = restTemplate.getForObject(url, String.class);
                 if (response == null || response.trim().isEmpty()) {
                     log.warn("Empty response for country {} (greaterthanid={})", countryCode, lastId);
+                    break;
+                }
+                if (response.trim().startsWith("<")) {
+                    log.warn("Received HTML instead of JSON (API may require key). Skipping.");
                     break;
                 }
 
@@ -190,9 +230,19 @@ public class OpenChargeMapService {
                     }
                 }
 
-                if (jsonNode.size() < IMPORT_PAGE_SIZE) {
-                    log.info("Last page ({} stations). Import complete.", jsonNode.size());
+                log.info("Page {}: received {} stations, lastId={}", pageNum, jsonNode.size(), lastId);
+
+                if (jsonNode.size() == 0) {
+                    log.info("Empty page. Import complete.");
                     break;
+                }
+                if (pageNum >= IMPORT_MAX_PAGES) {
+                    log.warn("Reached max pages ({}). Stopping.", IMPORT_MAX_PAGES);
+                    break;
+                }
+                // Request next page with lastId (API may return fewer than maxresults per request)
+                if (jsonNode.size() < IMPORT_PAGE_SIZE) {
+                    log.info("Partial page ({} stations). Fetching next with greaterthanid={}.", jsonNode.size(), lastId);
                 }
 
                 try {

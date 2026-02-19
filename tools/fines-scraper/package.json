@@ -1,0 +1,13 @@
+{
+  "name": "fines-scraper",
+  "version": "1.0.0",
+  "description": "Scrape Fines Charging locations from finescharging.com/locations",
+  "type": "module",
+  "scripts": {
+    "scrape": "node scrape.js",
+    "postinstall": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}

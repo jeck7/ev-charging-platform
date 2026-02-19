@@ -33,7 +33,9 @@ import { switchMap } from 'rxjs/operators';
 export class AdminPanelComponent implements OnInit, OnDestroy {
   selectedCountry = 'BG';
   isImporting = false;
+  isFinesScraping = false;
   currentJobId: string | null = null;
+  finesScrapeResult: { success: boolean; imported?: number; updated?: number; total?: number; error?: string } | null = null;
   importStatus: ImportJobStatus | null = null;
   stats: StationStats | null = null;
   enrichStatus: { chargeprice: boolean; ecomovement: boolean } | null = null;
@@ -101,27 +103,58 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   }
 
   startImport() {
-    if (this.isImporting) {
-      return;
-    }
-
+    if (this.isImporting) return;
     this.isImporting = true;
     this.importStatus = null;
-
     this.importService.importStations(this.selectedCountry).subscribe({
       next: (response) => {
         this.currentJobId = response.jobId;
-        this.snackBar.open(`Импортът започна за ${this.selectedCountry}`, 'OK', {
-          duration: 3000,
-        });
+        this.snackBar.open(`Импортът започна за ${this.selectedCountry}`, 'OK', { duration: 3000 });
         this.startPollingStatus();
       },
-      error: (error) => {
-        console.error('Error starting import:', error);
-        this.snackBar.open('Грешка при стартиране на импорт', 'OK', {
-          duration: 5000,
-        });
+      error: () => {
+        this.snackBar.open('Грешка при стартиране на импорт', 'OK', { duration: 5000 });
         this.isImporting = false;
+      },
+    });
+  }
+
+  startImportFines() {
+    if (this.isImporting) return;
+    this.isImporting = true;
+    this.importStatus = null;
+    this.importService.importFinesStations().subscribe({
+      next: (response) => {
+        this.currentJobId = response.jobId;
+        this.snackBar.open('Импорт Fines (от OCM) започна за България', 'OK', { duration: 3000 });
+        this.startPollingStatus();
+      },
+      error: () => {
+        this.snackBar.open('Грешка при стартиране на импорт Fines', 'OK', { duration: 5000 });
+        this.isImporting = false;
+      },
+    });
+  }
+
+  startImportFinesScrape() {
+    if (this.isFinesScraping) return;
+    this.isFinesScraping = true;
+    this.finesScrapeResult = null;
+    this.importService.importFinesScrape().subscribe({
+      next: (res) => {
+        this.finesScrapeResult = res;
+        if (res.success) {
+          this.snackBar.open(res.message ?? `Импортирани: ${res.imported}, актуализирани: ${res.updated}`, 'OK', { duration: 5000 });
+          this.loadStats();
+        } else {
+          this.snackBar.open(res.error ?? 'Скрапинг неуспешен.', 'OK', { duration: 6000 });
+        }
+        this.isFinesScraping = false;
+      },
+      error: (err) => {
+        this.finesScrapeResult = { success: false, error: err.error?.error ?? err.message ?? 'Грешка' };
+        this.snackBar.open(this.finesScrapeResult.error ?? 'Грешка при скрапинг', 'OK', { duration: 6000 });
+        this.isFinesScraping = false;
       },
     });
   }

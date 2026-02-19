@@ -42,15 +42,31 @@ public class StationImportService {
      * The actual import runs asynchronously
      */
     public String startImport(String countryCode, boolean isScheduled) {
-        String jobId = countryCode + "-" + System.currentTimeMillis();
+        return startImportWithOperator(countryCode, null, isScheduled);
+    }
+
+    /**
+     * Start import for a country filtered by operator (e.g. "Fines" for Fines Charging).
+     * Resolves operator ID from Open Charge Map reference data, then imports.
+     */
+    public String startImportByOperator(String countryCode, String operatorName, boolean isScheduled) {
+        Integer operatorId = openChargeMapService.findOperatorIdByTitle(operatorName);
+        if (operatorId == null) {
+            log.warn("Operator '{}' not found in OCM reference data. Importing all stations for {}.", operatorName, countryCode);
+        } else {
+            log.info("Resolved operator '{}' to OCM operatorId={}", operatorName, operatorId);
+        }
+        return startImportWithOperator(countryCode, operatorId, isScheduled);
+    }
+
+    private String startImportWithOperator(String countryCode, Integer operatorId, boolean isScheduled) {
+        String jobId = countryCode + (operatorId != null ? "-op" + operatorId : "") + "-" + System.currentTimeMillis();
         ImportJobStatus status = new ImportJobStatus(jobId, countryCode, isScheduled);
         status.setStatus("PENDING");
         status.setStartedAt(LocalDateTime.now());
         importJobs.put(jobId, status);
-        
-        // Start async import
-        importStationsAsync(jobId, countryCode);
-        
+
+        importStationsAsync(jobId, countryCode, operatorId);
         return jobId;
     }
 
@@ -58,19 +74,19 @@ public class StationImportService {
      * Async import execution
      */
     @Async
-    private void importStationsAsync(String jobId, String countryCode) {
+    private void importStationsAsync(String jobId, String countryCode, Integer operatorId) {
         ImportJobStatus status = importJobs.get(jobId);
         if (status == null) {
             log.error("Job {} not found", jobId);
             return;
         }
-        
+
         try {
             status.setStatus("RUNNING");
-            
-            log.info("Starting import for country: {} (jobId: {})", countryCode, jobId);
-            
-            var result = openChargeMapService.importStationsFromOpenChargeMap(countryCode);
+
+            log.info("Starting import for country: {} (jobId: {}, operatorId: {})", countryCode, jobId, operatorId);
+
+            var result = openChargeMapService.importStationsFromOpenChargeMap(countryCode, operatorId);
             
             status.setStatus("COMPLETED");
             status.setCompletedAt(LocalDateTime.now());

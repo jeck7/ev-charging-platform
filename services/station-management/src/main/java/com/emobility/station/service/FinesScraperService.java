@@ -1,0 +1,183 @@
+package com.emobility.station.service;
+
+import com.emobility.station.entity.ChargingStation;
+import com.emobility.station.repository.ChargingStationRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Стартира Node.js скрапера за https://finescharging.com/locations и импортира резултатите в БД.
+ * Изисква: Node.js в PATH и изпълнено веднъж в tools/fines-scraper: npm install && npx playwright install chromium
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class FinesScraperService {
+
+    private final ChargingStationRepository stationRepository;
+    private final ObjectMapper objectMapper;
+
+    @Value("${fines.scraper.path:tools/fines-scraper}")
+    private String scraperPath;
+
+    @Value("${fines.scraper.timeout-seconds:60}")
+    private int timeoutSeconds;
+
+    public ScrapeResult runScraperAndImport() {
+        Path dir = Paths.get(scraperPath).toAbsolutePath();
+        if (!Files.isDirectory(dir) || !Files.exists(dir.resolve("scrape.js"))) {
+            log.warn("Fines scraper not found at {}", dir);
+            return ScrapeResult.error("Scraper not found at " + dir + ". Run from project root and ensure tools/fines-scraper exists with scrape.js.");
+        }
+        ProcessBuilder pb = new ProcessBuilder("node", "scrape.js")
+                .directory(dir.toFile())
+                .redirectErrorStream(true);
+        try {
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            boolean finished = p.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            if (!finished) {
+                p.destroyForcibly();
+                return ScrapeResult.error("Scraper timed out after " + timeoutSeconds + "s");
+            }
+            if (p.exitValue() != 0) {
+                log.warn("Scraper exited with {}: {}", p.exitValue(), output);
+                return ScrapeResult.error("Scraper failed: " + (output.length() > 500 ? output.substring(0, 500) + "..." : output));
+            }
+            return importScrapedOutput(output.trim());
+        } catch (Exception e) {
+            log.error("Fines scraper error", e);
+            return ScrapeResult.error(e.getMessage());
+        }
+    }
+
+    private ScrapeResult importScrapedOutput(String jsonLine) {
+        if (jsonLine.isEmpty()) {
+            return ScrapeResult.error("Scraper returned empty output");
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> list = objectMapper.readValue(jsonLine, new TypeReference<List<Map<String, Object>>>() {});
+            if (list == null) list = new ArrayList<>();
+            int imported = 0;
+            int updated = 0;
+            for (Map<String, Object> item : list) {
+                try {
+                    ChargingStation s = mapToStation(item);
+                    if (s == null) continue;
+                    ChargingStation existing = stationRepository.findByExternalId(s.getExternalId());
+                    if (existing != null) {
+                        existing.setName(s.getName());
+                        existing.setAddress(s.getAddress());
+                        existing.setCity(s.getCity());
+                        existing.setCountry(s.getCountry());
+                        existing.setLatitude(s.getLatitude());
+                        existing.setLongitude(s.getLongitude());
+                        existing.setOperator(s.getOperator());
+                        existing.setMaxPowerKw(s.getMaxPowerKw());
+                        existing.setConnectorsJson(s.getConnectorsJson());
+                        stationRepository.save(existing);
+                        updated++;
+                    } else {
+                        stationRepository.save(s);
+                        imported++;
+                    }
+                } catch (Exception e) {
+                    log.warn("Skip station: {}", e.getMessage());
+                }
+            }
+            return new ScrapeResult(true, imported, updated, list.size(), null);
+        } catch (Exception e) {
+            log.error("Parse scraper output failed", e);
+            return ScrapeResult.error("Invalid JSON: " + e.getMessage());
+        }
+    }
+
+    private ChargingStation mapToStation(Map<String, Object> m) {
+        Object lat = m.get("latitude");
+        Object lng = m.get("longitude");
+        if (lat == null) lat = m.get("lat");
+        if (lng == null) lng = m.get("lng");
+        BigDecimal latitude = toBigDecimal(lat);
+        BigDecimal longitude = toBigDecimal(lng);
+        if (latitude == null || longitude == null) return null;
+        String name = String.valueOf(m.getOrDefault("name", "Fines Charging")).trim();
+        if (name.isEmpty()) name = "Fines Charging";
+        String address = String.valueOf(m.getOrDefault("address", "")).trim();
+        String city = String.valueOf(m.getOrDefault("city", "")).trim();
+        String country = String.valueOf(m.getOrDefault("country", "BG")).trim();
+        BigDecimal maxPowerKw = toBigDecimal(m.get("maxPowerKw"));
+        String externalId = "fines-scrape-" + latitude + "-" + longitude + "-" + name.hashCode();
+        String connectorsJson = null;
+        if (maxPowerKw != null) {
+            try {
+                connectorsJson = objectMapper.writeValueAsString(List.of(
+                        Map.of("type", "CCS", "powerKw", maxPowerKw.doubleValue())
+                ));
+            } catch (Exception ignored) {}
+        }
+        return ChargingStation.builder()
+                .name(name)
+                .address(address.isEmpty() ? name : address)
+                .city(city.isEmpty() ? null : city)
+                .country(country)
+                .latitude(latitude)
+                .longitude(longitude)
+                .operator("Fines Charging")
+                .maxPowerKw(maxPowerKw)
+                .connectorsJson(connectorsJson)
+                .status(ChargingStation.StationStatus.ACTIVE)
+                .externalId(externalId)
+                .build();
+    }
+
+    private static BigDecimal toBigDecimal(Object o) {
+        if (o == null) return null;
+        if (o instanceof Number) return BigDecimal.valueOf(((Number) o).doubleValue());
+        try {
+            return new BigDecimal(o.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static final class ScrapeResult {
+        private final boolean success;
+        private final int imported;
+        private final int updated;
+        private final int total;
+        private final String error;
+
+        public ScrapeResult(boolean success, int imported, int updated, int total, String error) {
+            this.success = success;
+            this.imported = imported;
+            this.updated = updated;
+            this.total = total;
+            this.error = error;
+        }
+
+        static ScrapeResult error(String message) {
+            return new ScrapeResult(false, 0, 0, 0, message);
+        }
+
+        public boolean isSuccess() { return success; }
+        public int getImported() { return imported; }
+        public int getUpdated() { return updated; }
+        public int getTotal() { return total; }
+        public String getError() { return error; }
+    }
+}

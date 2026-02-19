@@ -2,10 +2,15 @@ package com.emobility.station.controller;
 
 import com.emobility.station.chargeprice.ChargepriceService;
 import com.emobility.station.dto.ChargingStationResponse;
+import com.emobility.station.dto.ConnectorInfo;
+import com.emobility.station.dto.CreateStationRequest;
 import com.emobility.station.ecomovement.EcoMovementService;
 import com.emobility.station.dto.UpdateStationRequest;
 import com.emobility.station.entity.ChargingStation;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.emobility.station.repository.ChargingStationRepository;
+import com.emobility.station.service.FinesScraperService;
 import com.emobility.station.service.OpenChargeMapService;
 import com.emobility.station.service.StationImportService;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +18,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -24,10 +31,12 @@ import java.util.stream.Collectors;
 public class ChargingStationController {
 
     private final ChargingStationRepository stationRepository;
+    private final ObjectMapper objectMapper;
     private final OpenChargeMapService openChargeMapService;
     private final StationImportService importService;
     private final ChargepriceService chargepriceService;
     private final EcoMovementService ecoMovementService;
+    private final FinesScraperService finesScraperService;
 
     @GetMapping
     public List<ChargingStationResponse> getAllStations(
@@ -46,6 +55,51 @@ public class ChargingStationController {
             stations = stationRepository.findAll();
         }
         return stations.stream().map(ChargingStationResponse::from).collect(Collectors.toList());
+    }
+
+    /**
+     * Създай нова станция (ръчно добавена). externalId се задава като "manual-{uuid}".
+     */
+    @PostMapping
+    public ResponseEntity<ChargingStationResponse> createStation(@RequestBody CreateStationRequest body) {
+        if (body.getName() == null || body.getName().isBlank() || body.getAddress() == null || body.getAddress().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        String connectorsJson = null;
+        if (body.getConnectors() != null && !body.getConnectors().isEmpty()) {
+            try {
+                connectorsJson = objectMapper.writeValueAsString(body.getConnectors());
+            } catch (JsonProcessingException e) {
+                return ResponseEntity.badRequest().build();
+            }
+        } else if (body.getMaxPowerKw() != null || body.getUsageCost() != null) {
+            ConnectorInfo single = ConnectorInfo.builder()
+                    .type("CCS")
+                    .powerKw(body.getMaxPowerKw() != null ? body.getMaxPowerKw().doubleValue() : null)
+                    .usageCost(body.getUsageCost())
+                    .build();
+            try {
+                connectorsJson = objectMapper.writeValueAsString(Collections.singletonList(single));
+            } catch (JsonProcessingException e) {
+                return ResponseEntity.badRequest().build();
+            }
+        }
+        ChargingStation station = ChargingStation.builder()
+                .name(body.getName().trim())
+                .address(body.getAddress().trim())
+                .city(body.getCity() != null ? body.getCity().trim() : null)
+                .country(body.getCountry() != null ? body.getCountry().trim() : null)
+                .latitude(body.getLatitude())
+                .longitude(body.getLongitude())
+                .operator(body.getOperator() != null ? body.getOperator().trim() : null)
+                .maxPowerKw(body.getMaxPowerKw())
+                .connectorsJson(connectorsJson)
+                .usageCost(body.getUsageCost() != null && !body.getUsageCost().isBlank() ? body.getUsageCost().trim() : null)
+                .status(ChargingStation.StationStatus.ACTIVE)
+                .externalId("manual-" + UUID.randomUUID())
+                .build();
+        station = stationRepository.save(station);
+        return ResponseEntity.ok(ChargingStationResponse.from(station));
     }
 
     @GetMapping("/{id}")
@@ -107,12 +161,52 @@ public class ChargingStationController {
     @PostMapping("/import/{countryCode}")
     public ResponseEntity<Map<String, Object>> importStations(@PathVariable String countryCode) {
         String jobId = importService.startImport(countryCode.toUpperCase(), false);
-        
         return ResponseEntity.accepted().body(Map.of(
                 "jobId", jobId,
                 "country", countryCode.toUpperCase(),
                 "status", "STARTED",
                 "message", "Import job started. Use GET /api/stations/import/status/" + jobId + " to check progress"
+        ));
+    }
+
+    /**
+     * Import stations from Open Charge Map for a country filtered by operator (e.g. Fines Charging).
+     * Resolves operator ID from OCM reference data. If operator not found, imports all for country.
+     * Example: POST /api/stations/import/fines - импортира станции на Fines за България от OCM
+     */
+    @PostMapping("/import/fines")
+    public ResponseEntity<Map<String, Object>> importFinesStations() {
+        String countryCode = "BG";
+        String jobId = importService.startImportByOperator(countryCode, "Fines", false);
+        return ResponseEntity.accepted().body(Map.of(
+                "jobId", jobId,
+                "country", countryCode,
+                "operator", "Fines",
+                "status", "STARTED",
+                "message", "Import Fines (OCM operator) started. Use GET /api/stations/import/status/" + jobId + " to check progress"
+        ));
+    }
+
+    /**
+     * Скрапиране на локации от https://finescharging.com/locations и импорт в БД.
+     * Изисква Node.js и изпълнено в tools/fines-scraper: npm install && npx playwright install chromium.
+     * Стартиране от корена на проекта (ev-charging-platform), за да намери tools/fines-scraper.
+     */
+    @PostMapping("/import/fines-scrape")
+    public ResponseEntity<Map<String, Object>> importFinesScrape() {
+        var result = finesScraperService.runScraperAndImport();
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "imported", result.getImported(),
+                    "updated", result.getUpdated(),
+                    "total", result.getTotal(),
+                    "message", "Imported " + result.getImported() + ", updated " + result.getUpdated() + " (total from scrape: " + result.getTotal() + ")"
+            ));
+        }
+        return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", result.getError() != null ? result.getError() : "Scraper failed"
         ));
     }
 
