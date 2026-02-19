@@ -99,7 +99,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   }
 
   private startPollingStatus() {
-    if (!this.currentJobId) {
+    if (!this.currentJobId || this.currentJobId === 'unknown') {
+      console.warn('Invalid jobId, cannot start polling');
+      this.isImporting = false;
       return;
     }
 
@@ -110,6 +112,11 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (status) => {
+          if (!status) {
+            // Job not found yet, continue polling
+            return;
+          }
+
           this.importStatus = status;
 
           if (status.status === 'COMPLETED' || status.status === 'FAILED') {
@@ -134,7 +141,17 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
           }
         },
         error: (error) => {
+          // If 404, job might not be created yet, continue polling
+          if (error.status === 404) {
+            console.warn('Job not found yet, continuing to poll...');
+            return;
+          }
           console.error('Error polling status:', error);
+          // Stop polling on other errors
+          this.isImporting = false;
+          if (this.statusPollingSubscription) {
+            this.statusPollingSubscription.unsubscribe();
+          }
         },
       });
   }

@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,19 +38,37 @@ public class StationImportService {
     }
 
     /**
-     * Manual import trigger
+     * Start import and return job ID synchronously
+     * The actual import runs asynchronously
      */
-    @Async
-    public void importStations(String countryCode, boolean isScheduled) {
+    public String startImport(String countryCode, boolean isScheduled) {
         String jobId = countryCode + "-" + System.currentTimeMillis();
         ImportJobStatus status = new ImportJobStatus(jobId, countryCode, isScheduled);
+        status.setStatus("PENDING");
+        status.setStartedAt(LocalDateTime.now());
         importJobs.put(jobId, status);
+        
+        // Start async import
+        importStationsAsync(jobId, countryCode);
+        
+        return jobId;
+    }
+
+    /**
+     * Async import execution
+     */
+    @Async
+    private void importStationsAsync(String jobId, String countryCode) {
+        ImportJobStatus status = importJobs.get(jobId);
+        if (status == null) {
+            log.error("Job {} not found", jobId);
+            return;
+        }
         
         try {
             status.setStatus("RUNNING");
-            status.setStartedAt(LocalDateTime.now());
             
-            log.info("Starting import for country: {}", countryCode);
+            log.info("Starting import for country: {} (jobId: {})", countryCode, jobId);
             
             var result = openChargeMapService.importStationsFromOpenChargeMap(countryCode);
             
@@ -61,15 +80,23 @@ public class StationImportService {
             status.setMessage(String.format("Successfully imported %d stations, updated %d", 
                     result.getImported(), result.getUpdated()));
             
-            log.info("Import completed for {}: imported={}, updated={}, skipped={}", 
-                    countryCode, result.getImported(), result.getUpdated(), result.getSkipped());
+            log.info("Import completed for {} (jobId: {}): imported={}, updated={}, skipped={}", 
+                    countryCode, jobId, result.getImported(), result.getUpdated(), result.getSkipped());
             
         } catch (Exception e) {
             status.setStatus("FAILED");
             status.setCompletedAt(LocalDateTime.now());
             status.setMessage("Import failed: " + e.getMessage());
-            log.error("Import failed for country: {}", countryCode, e);
+            log.error("Import failed for country: {} (jobId: {})", countryCode, jobId, e);
         }
+    }
+
+    /**
+     * Manual import trigger (for scheduled imports)
+     */
+    @Async
+    public void importStations(String countryCode, boolean isScheduled) {
+        startImport(countryCode, isScheduled);
     }
 
     /**
@@ -85,6 +112,7 @@ public class StationImportService {
     public ImportJobStatus getLatestImportStatus(String countryCode) {
         return importJobs.values().stream()
                 .filter(job -> job.getCountryCode().equals(countryCode))
+                .filter(job -> job.getStartedAt() != null)
                 .max((a, b) -> a.getStartedAt().compareTo(b.getStartedAt()))
                 .orElse(null);
     }
@@ -110,7 +138,11 @@ public class StationImportService {
         private String countryCode;
         private boolean scheduled;
         private String status; // PENDING, RUNNING, COMPLETED, FAILED
+        
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime startedAt;
+        
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
         private LocalDateTime completedAt;
         private int imported;
         private int updated;

@@ -2,10 +2,12 @@ package com.emobility.station.service;
 
 import com.emobility.station.entity.ChargingStation;
 import com.emobility.station.repository.ChargingStationRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -26,8 +28,14 @@ public class OpenChargeMapService {
 
     private static final String OPEN_CHARGE_MAP_API_URL = "https://api.openchargemap.io/v3/poi/";
     
+    @Value("${openchargemap.api.key:}")
+    private String apiKey;
+    
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
+    
+    @Autowired
+    private ObjectMapper objectMapper;
+    
     private final ChargingStationRepository stationRepository;
 
     /**
@@ -39,12 +47,17 @@ public class OpenChargeMapService {
      */
     public List<Map<String, Object>> fetchNearbyStations(BigDecimal latitude, BigDecimal longitude, Integer distance) {
         try {
-            String url = String.format("%s?output=json&latitude=%s&longitude=%s&distance=%d&distanceunit=KM&maxresults=50",
-                    OPEN_CHARGE_MAP_API_URL, latitude, longitude, distance != null ? distance : 10);
+            String url = buildUrl("output=json&latitude=%s&longitude=%s&distance=%d&distanceunit=KM&maxresults=50",
+                    latitude, longitude, distance != null ? distance : 10);
             
             log.info("Fetching stations from Open Charge Map: {}", url);
             
             String response = restTemplate.getForObject(url, String.class);
+            if (response == null || response.trim().isEmpty()) {
+                log.warn("Empty response from Open Charge Map API");
+                return new ArrayList<>();
+            }
+            
             JsonNode jsonNode = objectMapper.readTree(response);
             
             List<Map<String, Object>> stations = new ArrayList<>();
@@ -56,6 +69,9 @@ public class OpenChargeMapService {
             
             log.info("Fetched {} stations from Open Charge Map", stations.size());
             return stations;
+        } catch (JsonProcessingException e) {
+            log.error("Error parsing JSON response from Open Charge Map", e);
+            return new ArrayList<>();
         } catch (Exception e) {
             log.error("Error fetching stations from Open Charge Map", e);
             return new ArrayList<>();
@@ -67,12 +83,16 @@ public class OpenChargeMapService {
      */
     public List<Map<String, Object>> fetchStationsByCountry(String countryCode) {
         try {
-            String url = String.format("%s?output=json&countrycode=%s&maxresults=100",
-                    OPEN_CHARGE_MAP_API_URL, countryCode);
+            String url = buildUrl("output=json&countrycode=%s&maxresults=100", countryCode);
             
             log.info("Fetching stations by country from Open Charge Map: {}", url);
             
             String response = restTemplate.getForObject(url, String.class);
+            if (response == null || response.trim().isEmpty()) {
+                log.warn("Empty response from Open Charge Map API for country {}", countryCode);
+                return new ArrayList<>();
+            }
+            
             JsonNode jsonNode = objectMapper.readTree(response);
             
             List<Map<String, Object>> stations = new ArrayList<>();
@@ -84,6 +104,9 @@ public class OpenChargeMapService {
             
             log.info("Fetched {} stations from Open Charge Map for country {}", stations.size(), countryCode);
             return stations;
+        } catch (JsonProcessingException e) {
+            log.error("Error parsing JSON response from Open Charge Map for country {}", countryCode, e);
+            return new ArrayList<>();
         } catch (Exception e) {
             log.error("Error fetching stations by country from Open Charge Map", e);
             return new ArrayList<>();
@@ -102,12 +125,22 @@ public class OpenChargeMapService {
         
         try {
             // Fetch all stations (Open Charge Map allows up to 10000 results)
-            String url = String.format("%s?output=json&countrycode=%s&maxresults=10000",
-                    OPEN_CHARGE_MAP_API_URL, countryCode);
+            String url = buildUrl("output=json&countrycode=%s&maxresults=10000", countryCode);
             
             log.info("Importing stations from Open Charge Map for country: {}", countryCode);
             
+            if (apiKey == null || apiKey.trim().isEmpty()) {
+                log.warn("Open Charge Map API key is not configured. Some requests may be rate-limited or rejected.");
+                log.warn("Get a free API key at: https://openchargemap.org/site/develop/api");
+                log.warn("Then add 'openchargemap.api.key=your-key' to application.properties");
+            }
+            
             String response = restTemplate.getForObject(url, String.class);
+            if (response == null || response.trim().isEmpty()) {
+                log.error("Empty response from Open Charge Map API for country {}", countryCode);
+                throw new RuntimeException("Empty response from Open Charge Map API");
+            }
+            
             JsonNode jsonNode = objectMapper.readTree(response);
             
             if (jsonNode.isArray()) {
@@ -129,9 +162,19 @@ public class OpenChargeMapService {
             log.info("Import completed: {} imported, {} updated, {} skipped", imported, updated, skipped);
             return new ImportResult(imported, updated, skipped);
             
+        } catch (JsonProcessingException e) {
+            log.error("Error parsing JSON response from Open Charge Map for country {}", countryCode, e);
+            throw new RuntimeException("Failed to parse JSON response from Open Charge Map API", e);
+        } catch (org.springframework.web.client.HttpClientErrorException.Forbidden e) {
+            if (e.getMessage() != null && e.getMessage().contains("REJECTED_APIKEY_MISSING")) {
+                log.error("Open Charge Map API requires an API key. Get a free key at: https://openchargemap.org/site/develop/api");
+                log.error("Add 'openchargemap.api.key=your-key' to application.properties");
+            }
+            log.error("Error importing stations from Open Charge Map: {}", e.getMessage());
+            throw e; // Re-throw to be handled by StationImportService
         } catch (Exception e) {
             log.error("Error importing stations from Open Charge Map", e);
-            return new ImportResult(0, 0, 0);
+            throw e; // Re-throw to be handled by StationImportService
         }
     }
 
@@ -271,5 +314,16 @@ public class OpenChargeMapService {
             }
         }
         return connectors;
+    }
+
+    /**
+     * Build URL with optional API key
+     */
+    private String buildUrl(String format, Object... args) {
+        String baseUrl = String.format("%s?%s", OPEN_CHARGE_MAP_API_URL, String.format(format, args));
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
+            return baseUrl + "&key=" + apiKey;
+        }
+        return baseUrl;
     }
 }

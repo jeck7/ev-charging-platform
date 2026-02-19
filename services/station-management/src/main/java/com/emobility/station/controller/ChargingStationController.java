@@ -83,16 +83,13 @@ public class ChargingStationController {
      */
     @PostMapping("/import/{countryCode}")
     public ResponseEntity<Map<String, Object>> importStations(@PathVariable String countryCode) {
-        importService.importStations(countryCode.toUpperCase(), false);
-        
-        // Get the latest job status
-        var latestStatus = importService.getLatestImportStatus(countryCode.toUpperCase());
+        String jobId = importService.startImport(countryCode.toUpperCase(), false);
         
         return ResponseEntity.accepted().body(Map.of(
-                "jobId", latestStatus != null ? latestStatus.getJobId() : "unknown",
+                "jobId", jobId,
                 "country", countryCode.toUpperCase(),
                 "status", "STARTED",
-                "message", "Import job started. Use GET /api/stations/import/status/{jobId} to check progress"
+                "message", "Import job started. Use GET /api/stations/import/status/" + jobId + " to check progress"
         ));
     }
 
