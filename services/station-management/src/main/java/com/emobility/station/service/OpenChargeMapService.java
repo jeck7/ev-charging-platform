@@ -210,6 +210,9 @@ public class OpenChargeMapService {
 
         // Calculate max power from connectors
         BigDecimal maxPowerKw = calculateMaxPower(stationNode);
+        String connectorsJson = connectorsToJson(stationNode);
+        // Usage cost: from first connection that has it, or leave null (admin can set later)
+        String usageCost = parseFirstUsageCost(stationNode);
 
         // Check if station already exists
         ChargingStation existingStation = stationRepository.findByExternalId(externalId);
@@ -224,6 +227,8 @@ public class OpenChargeMapService {
             existingStation.setLongitude(longitude);
             existingStation.setOperator(operator);
             existingStation.setMaxPowerKw(maxPowerKw);
+            existingStation.setConnectorsJson(connectorsJson);
+            existingStation.setUsageCost(usageCost != null ? usageCost : existingStation.getUsageCost());
             // Keep existing status unless it's maintenance
             if (existingStation.getStatus() == ChargingStation.StationStatus.MAINTENANCE) {
                 existingStation.setStatus(ChargingStation.StationStatus.ACTIVE);
@@ -241,10 +246,24 @@ public class OpenChargeMapService {
                     .longitude(longitude)
                     .operator(operator)
                     .maxPowerKw(maxPowerKw)
+                    .connectorsJson(connectorsJson)
+                    .usageCost(usageCost)
                     .status(ChargingStation.StationStatus.ACTIVE)
                     .build();
             return stationRepository.save(newStation);
         }
+    }
+
+    /** Take first UsageCost from any connection (OCM often has it per connection or not at all). */
+    private String parseFirstUsageCost(JsonNode stationNode) {
+        if (!stationNode.has("Connections") || !stationNode.get("Connections").isArray()) return null;
+        for (JsonNode connNode : stationNode.get("Connections")) {
+            if (connNode.has("UsageCost") && !connNode.get("UsageCost").isNull()) {
+                String s = connNode.get("UsageCost").asText().trim();
+                if (!s.isEmpty()) return s;
+            }
+        }
+        return null;
     }
 
     private BigDecimal calculateMaxPower(JsonNode stationNode) {
@@ -304,16 +323,48 @@ public class OpenChargeMapService {
         List<Map<String, String>> connectors = new ArrayList<>();
         if (stationNode.has("Connections") && stationNode.get("Connections").isArray()) {
             for (JsonNode connNode : stationNode.get("Connections")) {
-                connectors.add(Map.of(
-                    "type", connNode.has("ConnectionType") && connNode.get("ConnectionType").has("Title")
-                            ? connNode.get("ConnectionType").get("Title").asText() : "Unknown",
-                    "power", connNode.has("PowerKW") ? connNode.get("PowerKW").asText() : "0",
-                    "status", connNode.has("StatusType") && connNode.get("StatusType").has("Title")
-                            ? connNode.get("StatusType").get("Title").asText() : "Unknown"
-                ));
+                String type = connNode.has("ConnectionType") && connNode.get("ConnectionType").has("Title")
+                        ? connNode.get("ConnectionType").get("Title").asText() : "Unknown";
+                String power = connNode.has("PowerKW") ? connNode.get("PowerKW").asText() : "0";
+                String status = connNode.has("StatusType") && connNode.get("StatusType").has("Title")
+                        ? connNode.get("StatusType").get("Title").asText() : "Unknown";
+                // UsageCost may be present in OCM data (e.g. "0.39 EUR / kWh")
+                String usageCost = connNode.has("UsageCost") && !connNode.get("UsageCost").isNull()
+                        ? connNode.get("UsageCost").asText().trim() : null;
+                if (usageCost != null && !usageCost.isEmpty()) {
+                    connectors.add(Map.of("type", type, "power", power, "status", status, "usageCost", usageCost));
+                } else {
+                    connectors.add(Map.of("type", type, "power", power, "status", status));
+                }
             }
         }
         return connectors;
+    }
+
+    /** Serialize connectors to JSON for DB storage (type, powerKw, usageCost when present). */
+    private String connectorsToJson(JsonNode stationNode) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        if (stationNode.has("Connections") && stationNode.get("Connections").isArray()) {
+            for (JsonNode connNode : stationNode.get("Connections")) {
+                String type = connNode.has("ConnectionType") && connNode.get("ConnectionType").has("Title")
+                        ? connNode.get("ConnectionType").get("Title").asText() : "Unknown";
+                double powerKw = connNode.has("PowerKW") ? connNode.get("PowerKW").asDouble() : 0;
+                String usageCost = connNode.has("UsageCost") && !connNode.get("UsageCost").isNull()
+                        ? connNode.get("UsageCost").asText().trim() : null;
+                Map<String, Object> map = new java.util.HashMap<>(Map.of("type", type, "powerKw", powerKw));
+                if (usageCost != null && !usageCost.isEmpty()) {
+                    map.put("usageCost", usageCost);
+                }
+                list.add(map);
+            }
+        }
+        if (list.isEmpty()) return null;
+        try {
+            return objectMapper.writeValueAsString(list);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize connectors to JSON", e);
+            return null;
+        }
     }
 
     /**

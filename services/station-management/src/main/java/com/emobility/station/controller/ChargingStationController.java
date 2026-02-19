@@ -1,6 +1,9 @@
 package com.emobility.station.controller;
 
+import com.emobility.station.chargeprice.ChargepriceService;
 import com.emobility.station.dto.ChargingStationResponse;
+import com.emobility.station.ecomovement.EcoMovementService;
+import com.emobility.station.dto.UpdateStationRequest;
 import com.emobility.station.entity.ChargingStation;
 import com.emobility.station.repository.ChargingStationRepository;
 import com.emobility.station.service.OpenChargeMapService;
@@ -23,6 +26,8 @@ public class ChargingStationController {
     private final ChargingStationRepository stationRepository;
     private final OpenChargeMapService openChargeMapService;
     private final StationImportService importService;
+    private final ChargepriceService chargepriceService;
+    private final EcoMovementService ecoMovementService;
 
     @GetMapping
     public List<ChargingStationResponse> getAllStations(
@@ -47,6 +52,24 @@ public class ChargingStationController {
     public ResponseEntity<ChargingStationResponse> getStation(@PathVariable Long id) {
         return stationRepository.findById(id)
                 .map(s -> ResponseEntity.ok(ChargingStationResponse.from(s)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Обнови станция (напр. цена за локацията).
+     * Body: { "usageCost": "0.39 EUR / kWh" }
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<ChargingStationResponse> updateStation(
+            @PathVariable Long id,
+            @RequestBody UpdateStationRequest body) {
+        return stationRepository.findById(id)
+                .map(s -> {
+                    if (body.getUsageCost() != null) {
+                        s.setUsageCost(body.getUsageCost().trim().isEmpty() ? null : body.getUsageCost().trim());
+                    }
+                    return ResponseEntity.ok(ChargingStationResponse.from(stationRepository.save(s)));
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -115,6 +138,46 @@ public class ChargingStationController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(status);
+    }
+
+    /**
+     * Enrich stations with prices from Chargeprice and/or Eco-Movement (match by coordinates).
+     * Configure chargeprice.api.key and/or ecomovement.api.token. Example: POST /api/stations/enrich-prices/BG
+     */
+    @PostMapping("/enrich-prices/{countryCode}")
+    public ResponseEntity<Map<String, Object>> enrichPrices(@PathVariable String countryCode) {
+        String country = countryCode.toUpperCase();
+        int fromChargeprice = 0;
+        int fromEcoMovement = 0;
+        if (chargepriceService.isConfigured()) {
+            fromChargeprice = chargepriceService.enrichStationsWithPrices(country);
+        }
+        if (ecoMovementService.isConfigured()) {
+            fromEcoMovement = ecoMovementService.enrichStationsWithPrices(country);
+        }
+        if (fromChargeprice == 0 && fromEcoMovement == 0 && !chargepriceService.isConfigured() && !ecoMovementService.isConfigured()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "No price provider configured",
+                    "hint", "Set chargeprice.api.key (demo: https://tally.so/r/w4pJAX) and/or ecomovement.api.token"
+            ));
+        }
+        return ResponseEntity.ok(Map.of(
+                "country", country,
+                "stationsEnrichedFromChargeprice", fromChargeprice,
+                "stationsEnrichedFromEcoMovement", fromEcoMovement,
+                "message", "Stations updated with prices where available"
+        ));
+    }
+
+    /**
+     * Status of price providers (Chargeprice, Eco-Movement).
+     */
+    @GetMapping("/enrich-prices/status")
+    public ResponseEntity<Map<String, Object>> enrichPricesStatus() {
+        return ResponseEntity.ok(Map.of(
+                "chargeprice", chargepriceService.isConfigured(),
+                "ecomovement", ecoMovementService.isConfigured()
+        ));
     }
 
     /**

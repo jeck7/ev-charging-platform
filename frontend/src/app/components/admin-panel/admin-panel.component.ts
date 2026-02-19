@@ -36,6 +36,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   currentJobId: string | null = null;
   importStatus: ImportJobStatus | null = null;
   stats: StationStats | null = null;
+  enrichStatus: { chargeprice: boolean; ecomovement: boolean } | null = null;
+  isEnriching = false;
+  enrichResult: { stationsEnrichedFromChargeprice: number; stationsEnrichedFromEcoMovement: number } | null = null;
   private statusPollingSubscription?: Subscription;
 
   countries = [
@@ -53,6 +56,10 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.loadStats();
+    this.importService.getEnrichPricesStatus().subscribe({
+      next: (s) => (this.enrichStatus = s),
+      error: () => (this.enrichStatus = { chargeprice: false, ecomovement: false }),
+    });
   }
 
   ngOnDestroy() {
@@ -68,6 +75,27 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         console.error('Error loading stats:', error);
+      },
+    });
+  }
+
+  enrichPrices() {
+    if (this.isEnriching) return;
+    this.isEnriching = true;
+    this.enrichResult = null;
+    this.importService.enrichPrices(this.selectedCountry).subscribe({
+      next: (res) => {
+        this.enrichResult = {
+          stationsEnrichedFromChargeprice: res.stationsEnrichedFromChargeprice,
+          stationsEnrichedFromEcoMovement: res.stationsEnrichedFromEcoMovement,
+        };
+        this.snackBar.open(res.message, 'OK', { duration: 4000 });
+        this.loadStats();
+        this.isEnriching = false;
+      },
+      error: (err) => {
+        this.snackBar.open(err.error?.error || 'Грешка при обогатяване на цени', 'OK', { duration: 5000 });
+        this.isEnriching = false;
       },
     });
   }

@@ -20,6 +20,39 @@
       </mat-card-content>
     </mat-card>
   } @else {
+    @if (showImportPrompt && !isImporting) {
+      <mat-card class="import-prompt">
+        <mat-card-content>
+          <div class="import-prompt-content">
+            <div>
+              <mat-icon class="prompt-icon">info</mat-icon>
+              <div>
+                <strong>Няма много станции в базата данни</strong>
+                <p>Импортирайте станции от Open Charge Map за България, за да видите всички налични станции (включително в Люлин).</p>
+              </div>
+            </div>
+            <button
+              mat-raised-button
+              color="primary"
+              (click)="importStationsFromBulgaria()"
+            >
+              <mat-icon>cloud_download</mat-icon>
+              Импортирай станции от България
+            </button>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+    @if (isImporting) {
+      <mat-card class="import-prompt">
+        <mat-card-content>
+          <div class="import-prompt-content">
+            <mat-spinner diameter="24"></mat-spinner>
+            <span>Импортиране на станции от Open Charge Map...</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
     <div class="toolbar">
       <div class="view-toggle">
         <button type="button" class="view-btn" [class.active]="viewMode === 'split'" (click)="viewMode = 'split'">Карта + списък</button>
@@ -66,7 +99,14 @@
     </div>
 
     <div class="results-summary">
-      Показани: {{ filteredStations.length }} от {{ stations.length }} станции
+      @if (locationLoading) {
+        <span class="location-status"><mat-icon class="spin">my_location</mat-icon> Определяне на вашата локация...</span>
+      } @else if (userLocation) {
+        <span class="location-status location-ok"><mat-icon>my_location</mat-icon> Сортирани по близост до вас</span>
+      } @else if (locationError) {
+        <span class="location-status location-warn">{{ locationError }}</span>
+      }
+      <span class="count">Показани: {{ filteredStations.length }} от {{ stations.length }} станции</span>
     </div>
 
     <div class="split-view" [class.view-map]="viewMode === 'map'" [class.view-list]="viewMode === 'list'">
@@ -76,7 +116,10 @@
             [stations]="filteredStations"
             [selectedStationId]="selectedStationId"
             [center]="mapCenter"
-            [zoom]="6"
+            [zoom]="mapZoom"
+            [userLocation]="userLocation"
+            (mapClick)="onMapClick()"
+            (stationSelect)="onSelectStationFromMap($event)"
           />
         </div>
       }
@@ -87,46 +130,55 @@
           } @else {
             <div class="stations-grid">
               @for (station of filteredStations; track station.id) {
-                <a
-                  [routerLink]="['/stations', station.id]"
-                  class="station-link"
-                  (click)="onSelectStation(station)"
+                <mat-card
+                  class="station-card"
+                  matRipple
+                  [class.selected]="selectedStationId === station.id"
+                  (click)="onSelectStation(station, $event)"
                 >
-                  <mat-card
-                    class="station-card"
-                    matRipple
-                    [class.selected]="selectedStationId === station.id"
-                  >
-                    <mat-card-header>
-                      <mat-card-title>
-                        <mat-icon class="station-icon">ev_station</mat-icon>
-                        {{ station.name }}
-                      </mat-card-title>
-                      <mat-card-subtitle>
-                        <span
-                          class="status-badge"
-                          [class.active]="station.status === 'ACTIVE'"
-                        >
-                          {{ station.status }}
-                        </span>
-                        @if (station.maxPowerKw) {
-                          <span class="power-badge">{{ station.maxPowerKw }} kW</span>
-                        }
-                      </mat-card-subtitle>
-                    </mat-card-header>
+                  <mat-card-header>
+                    <mat-card-title>
+                      <mat-icon class="station-icon">ev_station</mat-icon>
+                      {{ station.name }}
+                    </mat-card-title>
+                    <mat-card-subtitle>
+                      <span
+                        class="status-badge"
+                        [class.active]="station.status === 'ACTIVE'"
+                      >
+                        {{ station.status }}
+                      </span>
+                      @if (station.maxPowerKw) {
+                        <span class="power-badge">{{ station.maxPowerKw }} kW</span>
+                      }
+                    </mat-card-subtitle>
+                  </mat-card-header>
                     <mat-card-content>
                       <p class="address">
                         <mat-icon>location_on</mat-icon>
                         {{ station.address }}, {{ station.city }}
                       </p>
-                      <p class="country">{{ station.country }}</p>
+                      <div class="station-meta">
+                        <p class="country">{{ station.country }}</p>
+                        @if (getStationDistance(station) !== null) {
+                          <p class="distance">
+                            <mat-icon>straighten</mat-icon>
+                            {{ formatDistance(getStationDistance(station)) }}
+                          </p>
+                        }
+                      </div>
                     </mat-card-content>
-                    <mat-card-actions>
+                  <mat-card-actions>
+                    <a
+                      [routerLink]="['/stations', station.id]"
+                      class="view-detail-link"
+                      (click)="$event.stopPropagation()"
+                    >
                       <span class="view-detail">Детайли</span>
                       <mat-icon>arrow_forward</mat-icon>
-                    </mat-card-actions>
-                  </mat-card>
-                </a>
+                    </a>
+                  </mat-card-actions>
+                </mat-card>
               }
             </div>
           }

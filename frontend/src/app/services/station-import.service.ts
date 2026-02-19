@@ -69,4 +69,28 @@ export class StationImportService {
       : `${this.apiUrl}/stats`;
     return this.http.get<StationStats>(url);
   }
+
+  /**
+   * Status of price enrichment providers (Chargeprice, Eco-Movement)
+   */
+  getEnrichPricesStatus(): Observable<{ chargeprice: boolean; ecomovement: boolean }> {
+    return this.http.get<{ chargeprice: boolean; ecomovement: boolean }>(`${this.apiUrl}/enrich-prices/status`);
+  }
+
+  /**
+   * Enrich stations with prices from Chargeprice / Eco-Movement (match by coordinates)
+   */
+  enrichPrices(countryCode: string): Observable<{
+    country: string;
+    stationsEnrichedFromChargeprice: number;
+    stationsEnrichedFromEcoMovement: number;
+    message: string;
+  }> {
+    return this.http.post<{
+      country: string;
+      stationsEnrichedFromChargeprice: number;
+      stationsEnrichedFromEcoMovement: number;
+      message: string;
+    }>(`${this.apiUrl}/enrich-prices/${countryCode}`, {});
+  }
 }

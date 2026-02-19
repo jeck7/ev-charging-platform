@@ -45,6 +45,13 @@ public class ChargingStation {
     private String operator;
     private BigDecimal maxPowerKw; // Maximum power rating
 
+    /** JSON array of connectors: [{"type":"CCS","powerKw":160,"usageCost":"0.39 EUR/kWh"}, ...] from Open Charge Map */
+    @Column(columnDefinition = "TEXT")
+    private String connectorsJson;
+
+    /** Цена по подразбиране за локацията, напр. "0.39 EUR / kWh" (когато OCM не подава цена на конектор). */
+    private String usageCost;
+
     public enum StationStatus {
         ACTIVE, INACTIVE, MAINTENANCE
     }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -11,8 +11,10 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { StationService } from '../../services/station.service';
+import { StationImportService } from '../../services/station-import.service';
 import { ChargingStation } from '../../models/charging-station.model';
 import { StationsMapComponent } from '../stations-map/stations-map.component';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 type ViewMode = 'split' | 'map' | 'list';
 
@@ -36,7 +38,7 @@ type ViewMode = 'split' | 'map' | 'list';
   templateUrl: './stations-list.component.html',
   styleUrl: './stations-list.component.css',
 })
-export class StationsListComponent implements OnInit {
+export class StationsListComponent implements OnInit, OnDestroy {
   stations: ChargingStation[] = [];
   filteredStations: ChargingStation[] = [];
   loading = true;
@@ -44,14 +46,53 @@ export class StationsListComponent implements OnInit {
   viewMode: ViewMode = 'split';
   selectedStationId: number | null = null;
 
+  /** Текуща локация на потребителя (от геолокация) */
+  userLocation: { lat: number; lng: number } | null = null;
+  locationLoading = false;
+  locationError: string | null = null;
+
   filterStatus: string = '';
   filterSearch: string = '';
   filterMinPower: number | null = null;
 
-  constructor(private stationService: StationService) {}
+  showImportPrompt = false;
+  isImporting = false;
+  private importPollInterval: any = null;
+
+  constructor(
+    private stationService: StationService,
+    private importService: StationImportService,
+    private snackBar: MatSnackBar
+  ) {}
 
   ngOnInit(): void {
+    this.requestUserLocation();
     this.loadStations();
+  }
+
+  requestUserLocation(): void {
+    if (!navigator.geolocation) {
+      this.locationError = 'Геолокацията не се поддържа от браузъра.';
+      return;
+    }
+    this.locationLoading = true;
+    this.locationError = null;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        this.userLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        this.locationLoading = false;
+        this.applyFilters();
+      },
+      () => {
+        this.locationLoading = false;
+        this.locationError = 'Локацията не е намерена. Показваме станции по подразбиране.';
+        this.applyFilters();
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
   }
 
   loadStations(): void {
@@ -60,6 +101,14 @@ export class StationsListComponent implements OnInit {
     this.stationService.getStations().subscribe({
       next: (data) => {
         this.stations = data;
+        // Покажи подсказка за импорт ако има малко станции (особено в България)
+        const bgStations = data.filter(
+          (s) =>
+            (s.country && s.country.toUpperCase() === 'BG') ||
+            (s.country && s.country.toLowerCase().includes('bulgaria'))
+        );
+        // Покажи подсказка ако има по-малко от 20 станции общо или по-малко от 10 в България
+        this.showImportPrompt = data.length < 20 || bgStations.length < 10;
         this.applyFilters();
         this.loading = false;
       },
@@ -68,6 +117,123 @@ export class StationsListComponent implements OnInit {
         this.loading = false;
       },
     });
+  }
+
+  importStationsFromBulgaria(): void {
+    if (this.isImporting) return;
+    this.isImporting = true;
+    this.showImportPrompt = false;
+    this.snackBar.open('Започва импорт на станции от България...', 'OK', {
+      duration: 3000,
+    });
+    this.importService.importStations('BG').subscribe({
+      next: (response) => {
+        this.snackBar.open(
+          `Импортът започна! Импортираме станции от Open Charge Map...`,
+          'OK',
+          { duration: 4000 }
+        );
+        // Poll за статус на импорта и обновяване на списъка
+        let pollCount = 0;
+        const maxPolls = 30; // Максимум 30 опита (около 60 секунди)
+        this.importPollInterval = setInterval(() => {
+          pollCount++;
+          this.importService.getImportStatus(response.jobId).subscribe({
+            next: (status) => {
+              if (status.status === 'COMPLETED') {
+                if (this.importPollInterval) {
+                  clearInterval(this.importPollInterval);
+                  this.importPollInterval = null;
+                }
+                this.snackBar.open(
+                  `Импортът завърши успешно! Импортирани: ${status.imported}, Актуализирани: ${status.updated}`,
+                  'OK',
+                  { duration: 5000 }
+                );
+                this.loadStations();
+                this.isImporting = false;
+              } else if (status.status === 'FAILED') {
+                if (this.importPollInterval) {
+                  clearInterval(this.importPollInterval);
+                  this.importPollInterval = null;
+                }
+                this.snackBar.open(
+                  `Импортът неуспешен: ${status.message || 'Неизвестна грешка'}`,
+                  'OK',
+                  { duration: 5000 }
+                );
+                this.isImporting = false;
+                this.showImportPrompt = true;
+              }
+            },
+            error: () => {
+              if (pollCount >= maxPolls) {
+                if (this.importPollInterval) {
+                  clearInterval(this.importPollInterval);
+                  this.importPollInterval = null;
+                }
+                this.snackBar.open(
+                  'Импортът продължава. Станциите ще се появят скоро.',
+                  'OK',
+                  { duration: 4000 }
+                );
+                setTimeout(() => this.loadStations(), 5000);
+                this.isImporting = false;
+              }
+            },
+          });
+        }, 2000); // Poll на всеки 2 секунди
+      },
+      error: () => {
+        this.snackBar.open('Грешка при стартиране на импорт', 'OK', {
+          duration: 5000,
+        });
+        this.isImporting = false;
+        this.showImportPrompt = true;
+      },
+    });
+  }
+
+  /** Разстояние в км (приблизително, Haversine) */
+  private distanceKm(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number
+  ): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  /** Изчисли разстоянието до станция от текущата локация */
+  getStationDistance(station: ChargingStation): number | null {
+    if (!this.userLocation || station.latitude == null || station.longitude == null) {
+      return null;
+    }
+    return this.distanceKm(
+      this.userLocation.lat,
+      this.userLocation.lng,
+      station.latitude,
+      station.longitude
+    );
+  }
+
+  /** Форматирай разстоянието за показване */
+  formatDistance(distanceKm: number | null): string {
+    if (distanceKm == null) return '';
+    if (distanceKm < 1) {
+      return `${Math.round(distanceKm * 1000)} m`;
+    }
+    return `${distanceKm.toFixed(1)} km`;
   }
 
   applyFilters(): void {
@@ -92,6 +258,27 @@ export class StationsListComponent implements OnInit {
           (s.country || '').toLowerCase().includes(q)
       );
     }
+    if (this.userLocation) {
+      result = result
+        .slice()
+        .sort((a, b) => {
+          if (a.latitude == null || a.longitude == null) return 1;
+          if (b.latitude == null || b.longitude == null) return -1;
+          const da = this.distanceKm(
+            this.userLocation!.lat,
+            this.userLocation!.lng,
+            a.latitude,
+            a.longitude
+          );
+          const db = this.distanceKm(
+            this.userLocation!.lat,
+            this.userLocation!.lng,
+            b.latitude,
+            b.longitude
+          );
+          return da - db;
+        });
+    }
     this.filteredStations = result;
   }
 
@@ -103,10 +290,37 @@ export class StationsListComponent implements OnInit {
     this.viewMode = mode;
   }
 
-  onSelectStation(station: ChargingStation): void {
+  onSelectStation(station: ChargingStation, event?: Event): void {
+    if (event) {
+      // Prevent navigation if clicking on the card (not the link)
+      const target = event.target as HTMLElement;
+      if (target.tagName !== 'A' && !target.closest('a')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
     this.selectedStationId = station.id;
+    
+    // If in list-only view, switch to split or map view to show the station
+    if (this.viewMode === 'list') {
+      this.viewMode = 'split';
+    }
   }
 
+  onMapClick(): void {
+    // Премахни фокуса от избраната станция когато се кликне върху картата
+    this.selectedStationId = null;
+  }
+
+  /** Избор на станция от картата (клик по маркер) – същият ефект като от списъка, включително чертане на маршрут */
+  onSelectStationFromMap(stationId: number): void {
+    const station = this.filteredStations.find((s) => s.id === stationId);
+    if (station) {
+      this.onSelectStation(station);
+    }
+  }
+
+  /** Център на картата: избрана станция или локация на потребителя */
   get mapCenter(): { lat: number; lng: number } | null {
     if (this.selectedStationId) {
       const s = this.filteredStations.find(
@@ -116,6 +330,18 @@ export class StationsListComponent implements OnInit {
         return { lat: s.latitude, lng: s.longitude };
       }
     }
-    return null;
+    return this.userLocation;
+  }
+
+  /** Zoom за картата: по-голям при локация на потребителя */
+  get mapZoom(): number {
+    if (this.selectedStationId) return 16;
+    return this.userLocation ? 12 : 6;
+  }
+
+  ngOnDestroy(): void {
+    if (this.importPollInterval) {
+      clearInterval(this.importPollInterval);
+    }
   }
 }

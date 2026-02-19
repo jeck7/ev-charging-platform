@@ -87,6 +87,31 @@
         </div>
       </div>
 
+      <!-- Enrich prices (Chargeprice / Eco-Movement) -->
+      <div class="import-section enrich-section">
+        <h3>Обогатяване на цени (Chargeprice / Eco-Movement)</h3>
+        <p class="enrich-desc">Попълва цени (EUR/kWh) за станциите чрез съпоставяне по координати с Chargeprice или Eco-Movement. Задайте <code>chargeprice.api.key</code> в сървъра (demo: <a href="https://tally.so/r/w4pJAX" target="_blank" rel="noopener">заявка за достъп</a>).</p>
+        <div class="enrich-status" *ngIf="enrichStatus">
+          <span>Chargeprice: {{ enrichStatus.chargeprice ? 'конфигуриран' : 'не е зададен ключ' }}</span>
+          <span>Eco-Movement: {{ enrichStatus.ecomovement ? 'конфигуриран' : 'не е зададен токен' }}</span>
+        </div>
+        <div class="import-actions">
+          <button
+            mat-stroked-button
+            color="primary"
+            (click)="enrichPrices()"
+            [disabled]="isEnriching"
+          >
+            <mat-icon>euro</mat-icon>
+            {{ isEnriching ? 'Обогатяване...' : 'Обогати цени за ' + selectedCountry }}
+          </button>
+        </div>
+        <div class="enrich-result" *ngIf="enrichResult">
+          <p><strong>Обогатени от Chargeprice:</strong> {{ enrichResult.stationsEnrichedFromChargeprice }}</p>
+          <p><strong>Обогатени от Eco-Movement:</strong> {{ enrichResult.stationsEnrichedFromEcoMovement }}</p>
+        </div>
+      </div>
+
       <!-- Info Section -->
       <div class="info-section">
         <mat-icon>info</mat-icon>

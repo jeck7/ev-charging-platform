@@ -34,6 +34,13 @@
   font-weight: 600;
 }
 
+::ng-deep .popup-distance {
+  margin: 0.25rem 0;
+  font-size: 12px;
+  color: #059669;
+  font-weight: 500;
+}
+
 ::ng-deep .popup-power {
   margin: 0.25rem 0;
   font-size: 12px;
@@ -54,6 +61,28 @@
 
 /* Hide default Leaflet marker */
 ::ng-deep .station-marker {
+  background: none !important;
+  border: none !important;
+}
+
+::ng-deep .station-marker.selected {
+  z-index: 1000 !important;
+}
+
+::ng-deep .user-location-marker {
+  background: none !important;
+  border: none !important;
+  font-size: 28px;
+  line-height: 1;
+}
+
+::ng-deep .user-location-popup .leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+::ng-deep .route-start-marker,
+::ng-deep .route-end-marker {
   background: none !important;
   border: none !important;
 }

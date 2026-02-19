@@ -1,5 +1,5 @@
 .detail-container {
-  max-width: 600px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
 }
@@ -40,14 +40,52 @@
   color: #dc2626;
 }
 
+.station-detail-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .station-detail-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
 .station-detail {
   padding: 1.5rem;
+}
+
+.map-panel {
+  position: sticky;
+  top: 2rem;
+  height: 500px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.station-map {
+  width: 100%;
+  height: 100%;
+}
+
+::ng-deep .station-detail-marker {
+  background: none !important;
+  border: none !important;
 }
 
 .station-icon {
   vertical-align: middle;
   margin-right: 0.5rem;
   color: #3f51b5;
+}
+
+.power-title {
+  font-weight: 600;
+  color: #3b82f6;
+  font-size: 0.95em;
 }
 
 .status-badge {
@@ -63,6 +101,14 @@
 .status-badge.active {
   background: #dcfce7;
   color: #166534;
+}
+
+.operator-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
 }
 
 .address {
@@ -84,15 +130,84 @@
   margin: 0 0 1rem;
 }
 
-.map-link {
+.nav-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.nav-heading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.75rem;
+}
+
+.nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.nav-link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 1rem;
 }
 
-.map-link mat-icon {
+.nav-link mat-icon {
   font-size: 20px;
   width: 20px;
   height: 20px;
+}
+
+.connectors-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.connectors-heading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.75rem;
+}
+
+.connectors-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.connector-item {
+  padding: 0.5rem 0;
+  font-size: 0.9375rem;
+  color: #4b5563;
+}
+
+.connector-type {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.connector-details {
+  margin-left: 0.25rem;
+}
+
+.connectors-empty {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.connectors-empty a {
+  color: #3f51b5;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.connectors-empty a:hover {
+  text-decoration: underline;
 }

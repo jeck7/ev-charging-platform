@@ -1,54 +1,107 @@
 <div class="detail-container">
   <button mat-stroked-button routerLink="/" class="back-button">
     <mat-icon>arrow_back</mat-icon>
-    Back to stations
+    Назад към станциите
   </button>
 
   @if (loading) {
     <div class="loading">
       <mat-spinner diameter="40"></mat-spinner>
-      <span>Loading...</span>
+      <span>Зареждане...</span>
     </div>
   } @else if (error || !station) {
     <mat-card class="error-card">
       <mat-card-content>
         <mat-icon color="warn">error_outline</mat-icon>
-        <p>{{ error || 'Station not found' }}</p>
+        <p>{{ error || 'Станцията не е намерена' }}</p>
       </mat-card-content>
     </mat-card>
   } @else {
-    <mat-card class="station-detail">
-      <mat-card-header>
-        <mat-card-title>
-          <mat-icon class="station-icon">ev_station</mat-icon>
-          {{ station.name }}
-        </mat-card-title>
-        <mat-card-subtitle>
-          <span class="status-badge" [class.active]="station.status === 'ACTIVE'">
-            {{ station.status }}
-          </span>
-        </mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        <p class="address">
-          <mat-icon>location_on</mat-icon>
-          {{ station.address }}, {{ station.city }}
-        </p>
-        <p class="location">{{ station.country }}</p>
-        @if (station.latitude && station.longitude) {
-          <a
-            mat-raised-button
-            color="primary"
-            [href]="'https://maps.google.com/?q=' + station.latitude + ',' + station.longitude"
-            target="_blank"
-            rel="noopener"
-            class="map-link"
-          >
-            <mat-icon>map</mat-icon>
-            View on map
-          </a>
-        }
-      </mat-card-content>
-    </mat-card>
+    <div class="station-detail-wrapper">
+      <mat-card class="station-detail">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon class="station-icon">ev_station</mat-icon>
+            {{ station.name }}
+            @if (station.maxPowerKw) {
+              <span class="power-title">· {{ station.maxPowerKw }} kW</span>
+            }
+          </mat-card-title>
+          <mat-card-subtitle>
+            <span class="status-badge" [class.active]="station.status === 'ACTIVE'">
+              {{ station.status === 'ACTIVE' ? 'Активна' : station.status === 'MAINTENANCE' ? 'Поддръжка' : station.status }}
+            </span>
+            @if (station.operator) {
+              <span class="operator-badge">{{ station.operator }}</span>
+            }
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p class="address">
+            <mat-icon>location_on</mat-icon>
+            {{ station.address }}{{ station.city ? ', ' + station.city : '' }}{{ station.country ? ', ' + station.country : '' }}
+          </p>
+
+          @if (station.latitude != null && station.longitude != null) {
+            <section class="nav-section">
+              <h3 class="nav-heading">Как да стигна</h3>
+              <div class="nav-links">
+                <a
+                  mat-stroked-button
+                  [href]="'https://www.google.com/maps/dir/?api=1&destination=' + station.latitude + ',' + station.longitude"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="nav-link"
+                >
+                  <mat-icon>map</mat-icon>
+                  Google Maps
+                </a>
+                <a
+                  mat-stroked-button
+                  [href]="'https://waze.com/ul?ll=' + station.latitude + ',' + station.longitude + '&navigate=yes'"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="nav-link"
+                >
+                  <mat-icon>navigation</mat-icon>
+                  Waze
+                </a>
+              </div>
+            </section>
+          }
+
+          <section class="connectors-section">
+            <h3 class="connectors-heading">На локацията има следните зарядни станции</h3>
+            @if (station.connectors && station.connectors.length > 0) {
+              <ul class="connectors-list">
+                @for (conn of station.connectors; track $index) {
+                  <li class="connector-item">
+                    <span class="connector-type">{{ conn.type }}</span>
+                    <span class="connector-details">
+                      конектор с максимална мощност <strong>{{ conn.powerKw }} kW</strong>
+                      @if (conn.usageCost || station.usageCost) {
+                        и цена {{ conn.usageCost ?? station.usageCost }}.
+                      } @else {
+                        .
+                      }
+                    </span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="connectors-empty">
+                Няма въведени данни за конектори за тази станция. Данните се попълват при импорт от Open Charge Map — импортирайте станциите отново от <a routerLink="/admin">админ панела</a>, за да се покажат тип конектор (CCS, Type 2 и др.), мощност и цена (напр. 0.39 EUR / kWh). Цените в Open Charge Map често липсват; при нужда може да се зададе цена за локацията чрез API.
+              </p>
+            }
+          </section>
+        </mat-card-content>
+      </mat-card>
+
+      @if (station.latitude != null && station.longitude != null) {
+        <div class="map-panel">
+          <div [id]="mapId" class="station-map"></div>
+        </div>
+      }
+    </div>
   }
 </div>
