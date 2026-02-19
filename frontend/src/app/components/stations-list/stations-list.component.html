@@ -1,13 +1,13 @@
 <div class="stations-container">
   <header class="page-header">
-    <h1>Charging Stations</h1>
-    <p class="subtitle">Find EV charging points across Europe</p>
+    <h1>Зарядни станции</h1>
+    <p class="subtitle">Намерете станции за зареждане на електромобили</p>
   </header>
 
   @if (loading) {
     <div class="loading">
       <mat-spinner diameter="40"></mat-spinner>
-      <span>Loading stations...</span>
+      <span>Зареждане на станции...</span>
     </div>
   } @else if (error) {
     <mat-card class="error-card">
@@ -15,39 +15,122 @@
         <mat-icon color="warn">error_outline</mat-icon>
         <p>{{ error }}</p>
         <button mat-raised-button color="primary" (click)="loadStations()">
-          Retry
+          Опитай отново
         </button>
       </mat-card-content>
     </mat-card>
   } @else {
-    <div class="stations-grid">
-      @for (station of stations; track station.id) {
-        <a [routerLink]="['/stations', station.id]" class="station-link">
-          <mat-card class="station-card" matRipple>
-            <mat-card-header>
-              <mat-card-title>
-                <mat-icon class="station-icon">ev_station</mat-icon>
-                {{ station.name }}
-              </mat-card-title>
-              <mat-card-subtitle>
-                <span class="status-badge" [class.active]="station.status === 'ACTIVE'">
-                  {{ station.status }}
-                </span>
-              </mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              <p class="address">
-                <mat-icon>location_on</mat-icon>
-                {{ station.address }}, {{ station.city }}
-              </p>
-              <p class="country">{{ station.country }}</p>
-            </mat-card-content>
-            <mat-card-actions>
-              <span class="view-detail">View details</span>
-              <mat-icon>arrow_forward</mat-icon>
-            </mat-card-actions>
-          </mat-card>
-        </a>
+    <div class="toolbar">
+      <div class="view-toggle">
+        <button type="button" class="view-btn" [class.active]="viewMode === 'split'" (click)="viewMode = 'split'">Карта + списък</button>
+        <button type="button" class="view-btn" [class.active]="viewMode === 'map'" (click)="viewMode = 'map'">Карта</button>
+        <button type="button" class="view-btn" [class.active]="viewMode === 'list'" (click)="viewMode = 'list'">Списък</button>
+      </div>
+
+      <div class="filters">
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Търсене</mat-label>
+          <input
+            matInput
+            [(ngModel)]="filterSearch"
+            (ngModelChange)="onFilterChange()"
+            placeholder="Име, адрес, град..."
+          />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Статус</mat-label>
+          <mat-select
+            [(ngModel)]="filterStatus"
+            (ngModelChange)="onFilterChange()"
+          >
+            <mat-option value="">Всички</mat-option>
+            <mat-option value="ACTIVE">Активни</mat-option>
+            <mat-option value="MAINTENANCE">Поддръжка</mat-option>
+            <mat-option value="INACTIVE">Неактивни</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Мин. мощност (kW)</mat-label>
+          <mat-select
+            [(ngModel)]="filterMinPower"
+            (ngModelChange)="onFilterChange()"
+          >
+            <mat-option [value]="null">Всички</mat-option>
+            <mat-option [value]="22">≥ 22 kW</mat-option>
+            <mat-option [value]="50">≥ 50 kW</mat-option>
+            <mat-option [value]="100">≥ 100 kW</mat-option>
+            <mat-option [value]="150">≥ 150 kW</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div class="results-summary">
+      Показани: {{ filteredStations.length }} от {{ stations.length }} станции
+    </div>
+
+    <div class="split-view" [class.view-map]="viewMode === 'map'" [class.view-list]="viewMode === 'list'">
+      @if (viewMode === 'map' || viewMode === 'split') {
+        <div class="map-panel">
+          <app-stations-map
+            [stations]="filteredStations"
+            [selectedStationId]="selectedStationId"
+            [center]="mapCenter"
+            [zoom]="6"
+          />
+        </div>
+      }
+      @if (viewMode === 'list' || viewMode === 'split') {
+        <div class="list-panel">
+          @if (filteredStations.length === 0) {
+            <p class="no-results">Няма станции при тези филтри.</p>
+          } @else {
+            <div class="stations-grid">
+              @for (station of filteredStations; track station.id) {
+                <a
+                  [routerLink]="['/stations', station.id]"
+                  class="station-link"
+                  (click)="onSelectStation(station)"
+                >
+                  <mat-card
+                    class="station-card"
+                    matRipple
+                    [class.selected]="selectedStationId === station.id"
+                  >
+                    <mat-card-header>
+                      <mat-card-title>
+                        <mat-icon class="station-icon">ev_station</mat-icon>
+                        {{ station.name }}
+                      </mat-card-title>
+                      <mat-card-subtitle>
+                        <span
+                          class="status-badge"
+                          [class.active]="station.status === 'ACTIVE'"
+                        >
+                          {{ station.status }}
+                        </span>
+                        @if (station.maxPowerKw) {
+                          <span class="power-badge">{{ station.maxPowerKw }} kW</span>
+                        }
+                      </mat-card-subtitle>
+                    </mat-card-header>
+                    <mat-card-content>
+                      <p class="address">
+                        <mat-icon>location_on</mat-icon>
+                        {{ station.address }}, {{ station.city }}
+                      </p>
+                      <p class="country">{{ station.country }}</p>
+                    </mat-card-content>
+                    <mat-card-actions>
+                      <span class="view-detail">Детайли</span>
+                      <mat-icon>arrow_forward</mat-icon>
+                    </mat-card-actions>
+                  </mat-card>
+                </a>
+              }
+            </div>
+          }
+        </div>
       }
     </div>
   }
