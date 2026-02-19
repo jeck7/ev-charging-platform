@@ -1,9 +1,10 @@
 export const environment = {
   production: false,
-  // Use HTTPS through nginx gateway (which handles mTLS)
-  stationsApiUrl: 'https://localhost:8443/api',
-  sessionsApiUrl: 'https://localhost:8443/api',
-  // For direct backend access (development only, requires client cert)
-  // stationsApiUrl: 'https://localhost:8082/api',
-  // sessionsApiUrl: 'https://localhost:8081/api',
+  // For local development: direct backend access (without gateway)
+  // Note: Browser cannot send client certs, so backend should use client-auth=want or none for dev
+  stationsApiUrl: 'https://localhost:8082/api',
+  sessionsApiUrl: 'https://localhost:8081/api',
+  // For Docker with nginx gateway:
+  // stationsApiUrl: 'https://localhost:8443/api',
+  // sessionsApiUrl: 'https://localhost:8443/api',
 };

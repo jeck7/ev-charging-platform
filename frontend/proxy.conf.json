@@ -1,0 +1,20 @@
+{
+  "/api/stations": {
+    "target": "https://localhost:8082",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug",
+    "headers": {
+      "Host": "localhost:8082"
+    }
+  },
+  "/api/sessions": {
+    "target": "https://localhost:8081",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug",
+    "headers": {
+      "Host": "localhost:8081"
+    }
+  }
+}

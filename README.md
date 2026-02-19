@@ -8,6 +8,7 @@ EV charging services platform – microservices backend (Java/Spring Boot) and A
 - **Frontend**: Angular 17, TypeScript
 - **Infrastructure**: Docker, Docker Compose
 - **Security**: mTLS (mutual TLS), Spring Security, nginx API Gateway
+- **Integrations**: Open Charge Map API, OCPP (WebSocket), ISO 15118 Plug & Charge, Tesla API
 
 ## Services
 
@@ -77,6 +78,16 @@ cd services/charging-sessions && mvn spring-boot:run
 - `GET /api/stations` - List all stations
 - `GET /api/stations?city=Munich` - Filter by city
 - `GET /api/stations/{id}` - Get station by ID
+- `GET /api/stations/stats` - Get station statistics
+- `POST /api/stations/import/{countryCode}` - Import stations from Open Charge Map (e.g., `/import/bg`)
+- `GET /api/stations/import/status/{jobId}` - Get import job status
+- `GET /api/stations/openchargemap/nearby` - Fetch nearby stations from Open Charge Map
+- `GET /api/stations/openchargemap/country/{code}` - Fetch stations by country
+- `GET /api/integrations/tesla/vehicles` - Get Tesla vehicles (requires OAuth token)
+- `POST /api/integrations/iso15118/authenticate` - ISO 15118 Plug & Charge authentication
+
+### OCPP WebSocket
+- `ws://localhost:8082/ocpp/{chargePointId}` - OCPP protocol endpoint for charge points
 
 ### Charging Sessions (8081)
 - `POST /api/sessions/start` - Start session `{"userId":"u1","chargingPointId":1}`

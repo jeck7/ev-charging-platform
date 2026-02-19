@@ -17,6 +17,8 @@ public class ChargingStationResponse {
     private BigDecimal latitude;
     private BigDecimal longitude;
     private String status;
+    private String operator;
+    private BigDecimal maxPowerKw;
 
     public static ChargingStationResponse from(ChargingStation s) {
         return ChargingStationResponse.builder()
@@ -28,6 +30,8 @@ public class ChargingStationResponse {
                 .latitude(s.getLatitude())
                 .longitude(s.getLongitude())
                 .status(s.getStatus().name())
+                .operator(s.getOperator())
+                .maxPowerKw(s.getMaxPowerKw())
                 .build();
     }
 }

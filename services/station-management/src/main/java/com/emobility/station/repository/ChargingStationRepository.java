@@ -8,4 +8,6 @@ import java.util.List;
 public interface ChargingStationRepository extends JpaRepository<ChargingStation, Long> {
     List<ChargingStation> findByCity(String city);
     List<ChargingStation> findByStatus(ChargingStation.StationStatus status);
+    boolean existsByExternalId(String externalId);
+    ChargingStation findByExternalId(String externalId);
 }

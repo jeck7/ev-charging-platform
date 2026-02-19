@@ -1,0 +1,100 @@
+<div class="admin-panel">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>admin_panel_settings</mat-icon>
+        Админ Панел - Импорт на Станции
+      </mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <!-- Statistics -->
+      <div class="stats-section" *ngIf="stats">
+        <h3>Статистика</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value">{{ stats.totalStations }}</div>
+            <div class="stat-label">Общо Станции</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ stats.activeStations }}</div>
+            <div class="stat-label">Активни</div>
+          </div>
+          <div class="stat-card" *ngIf="stats.countryStations !== undefined">
+            <div class="stat-value">{{ stats.countryStations }}</div>
+            <div class="stat-label">В {{ selectedCountry }}</div>
+          </div>
+        </div>
+
+        <div class="last-import" *ngIf="stats.lastImport">
+          <strong>Последен импорт:</strong> {{ formatDate(stats.lastImport.date) }}<br>
+          Импортирани: {{ stats.lastImport.imported }}, Актуализирани: {{ stats.lastImport.updated }}
+        </div>
+      </div>
+
+      <!-- Import Section -->
+      <div class="import-section">
+        <h3>Импорт от Open Charge Map</h3>
+        
+        <mat-form-field appearance="outline">
+          <mat-label>Държава</mat-label>
+          <mat-select [(ngModel)]="selectedCountry" (selectionChange)="loadStats()">
+            <mat-option *ngFor="let country of countries" [value]="country.code">
+              {{ country.name }} ({{ country.code }})
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="import-actions">
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="startImport()"
+            [disabled]="isImporting"
+          >
+            <mat-icon>cloud_download</mat-icon>
+            {{ isImporting ? 'Импортиране...' : 'Стартирай Импорт' }}
+          </button>
+        </div>
+
+        <!-- Import Status -->
+        <div class="import-status" *ngIf="importStatus">
+          <h4>Статус на Импорт</h4>
+          <div class="status-info">
+            <div class="status-badge" [style.color]="getStatusColor(importStatus.status)">
+              <mat-icon *ngIf="importStatus.status === 'RUNNING'">sync</mat-icon>
+              <mat-icon *ngIf="importStatus.status === 'COMPLETED'">check_circle</mat-icon>
+              <mat-icon *ngIf="importStatus.status === 'FAILED'">error</mat-icon>
+              {{ importStatus.status }}
+            </div>
+            
+            <div class="status-details" *ngIf="importStatus.status === 'RUNNING'">
+              <mat-spinner diameter="20"></mat-spinner>
+              <span>Импортиране в процес...</span>
+            </div>
+
+            <div class="status-details" *ngIf="importStatus.status === 'COMPLETED'">
+              <p><strong>Импортирани:</strong> {{ importStatus.imported }}</p>
+              <p><strong>Актуализирани:</strong> {{ importStatus.updated }}</p>
+              <p><strong>Пропуснати:</strong> {{ importStatus.skipped }}</p>
+              <p><strong>Завършен:</strong> {{ formatDate(importStatus.completedAt) }}</p>
+            </div>
+
+            <div class="status-details" *ngIf="importStatus.status === 'FAILED'">
+              <p class="error">{{ importStatus.message }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Section -->
+      <div class="info-section">
+        <mat-icon>info</mat-icon>
+        <p>
+          Импортът се извършва автоматично всеки ден в 02:00 за България.
+          Можете да стартирате ръчен импорт по всяко време.
+        </p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

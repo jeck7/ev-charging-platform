@@ -13,13 +13,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Enable mTLS - require client certificate authentication
+            // Allow all requests (client cert is optional - handled at SSL level)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/**").authenticated()
+                .requestMatchers("/api/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()
             )
-            // Configure to use X.509 client certificate authentication
+            // Configure X.509 authentication (optional - only if client cert is provided)
             .x509(x509 -> x509
                 .subjectPrincipalRegex("CN=(.*?)(?:,|$)")
                 .userDetailsService(username -> {

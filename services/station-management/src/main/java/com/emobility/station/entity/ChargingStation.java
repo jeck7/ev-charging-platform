@@ -37,6 +37,14 @@ public class ChargingStation {
     @Column(nullable = false)
     private StationStatus status;
 
+    // External ID from Open Charge Map (to avoid duplicates)
+    @Column(unique = true)
+    private String externalId;
+
+    // Additional fields for better station management
+    private String operator;
+    private BigDecimal maxPowerKw; // Maximum power rating
+
     public enum StationStatus {
         ACTIVE, INACTIVE, MAINTENANCE
     }
