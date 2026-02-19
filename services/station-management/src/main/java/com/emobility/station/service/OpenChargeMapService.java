@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Service for integrating with Open Charge Map API
@@ -113,8 +114,33 @@ public class OpenChargeMapService {
         }
     }
 
+    /** Page size for paginated import (OCM recommends 1000–2000 per request). */
+    private static final int IMPORT_PAGE_SIZE = 2000;
+    /** Pause between pages to avoid rate limiting (ms). */
+    private static final int IMPORT_PAGE_DELAY_MS = 400;
+
     /**
-     * Import all stations from Open Charge Map for a country into local database
+     * Build URL for one page of import: country + sortby=id_asc + greaterthanid for pagination.
+     */
+    private String buildImportPageUrl(String countryCode, long greaterThanId) {
+        String params = String.format(
+            "output=json&countrycode=%s&maxresults=%d&sortby=id_asc&compact=true&verbose=false",
+            countryCode, IMPORT_PAGE_SIZE
+        );
+        if (greaterThanId > 0) {
+            params += "&greaterthanid=" + greaterThanId;
+        }
+        String baseUrl = OPEN_CHARGE_MAP_API_URL + "?" + params;
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
+            return baseUrl + "&key=" + apiKey;
+        }
+        return baseUrl;
+    }
+
+    /**
+     * Import all stations from Open Charge Map for a country into local database.
+     * Uses pagination (sortby=id_asc, greaterthanid) so we load every station, not just the first 10k.
+     *
      * @param countryCode Country code (e.g., "BG" for Bulgaria)
      * @return Import result with counts
      */
@@ -122,46 +148,65 @@ public class OpenChargeMapService {
         int imported = 0;
         int updated = 0;
         int skipped = 0;
-        
+        long lastId = 0;
+        int pageNum = 0;
+
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            log.warn("Open Charge Map API key is not configured. Some requests may be rate-limited or rejected.");
+            log.warn("Get a free API key at: https://openchargemap.org/site/develop/api");
+            log.warn("Then add 'openchargemap.api.key=your-key' to application.properties");
+        }
+
         try {
-            // Fetch all stations (Open Charge Map allows up to 10000 results)
-            String url = buildUrl("output=json&countrycode=%s&maxresults=10000", countryCode);
-            
-            log.info("Importing stations from Open Charge Map for country: {}", countryCode);
-            
-            if (apiKey == null || apiKey.trim().isEmpty()) {
-                log.warn("Open Charge Map API key is not configured. Some requests may be rate-limited or rejected.");
-                log.warn("Get a free API key at: https://openchargemap.org/site/develop/api");
-                log.warn("Then add 'openchargemap.api.key=your-key' to application.properties");
-            }
-            
-            String response = restTemplate.getForObject(url, String.class);
-            if (response == null || response.trim().isEmpty()) {
-                log.error("Empty response from Open Charge Map API for country {}", countryCode);
-                throw new RuntimeException("Empty response from Open Charge Map API");
-            }
-            
-            JsonNode jsonNode = objectMapper.readTree(response);
-            
-            if (jsonNode.isArray()) {
+            log.info("Importing stations from Open Charge Map for country: {} (paginated, page size {})", countryCode, IMPORT_PAGE_SIZE);
+
+            while (true) {
+                pageNum++;
+                String url = buildImportPageUrl(countryCode, lastId);
+                log.info("Fetching page {} (greaterthanid={})", pageNum, lastId);
+
+                String response = restTemplate.getForObject(url, String.class);
+                if (response == null || response.trim().isEmpty()) {
+                    log.warn("Empty response for country {} (greaterthanid={})", countryCode, lastId);
+                    break;
+                }
+
+                JsonNode jsonNode = objectMapper.readTree(response);
+                if (!jsonNode.isArray() || jsonNode.size() == 0) {
+                    break;
+                }
+
                 for (JsonNode stationNode : jsonNode) {
                     try {
-                        ChargingStation station = parseAndSaveStation(stationNode);
-                        if (station.getId() == null) {
-                            imported++;
-                        } else {
-                            updated++;
-                        }
+                        long extId = stationNode.has("ID") ? stationNode.get("ID").asLong() : lastId;
+                        if (extId > lastId) lastId = extId;
+
+                        SaveResult result = parseAndSaveStation(stationNode);
+                        if (result.wasNew()) imported++;
+                        else updated++;
                     } catch (Exception e) {
                         log.warn("Error importing station: {}", e.getMessage());
                         skipped++;
                     }
                 }
+
+                if (jsonNode.size() < IMPORT_PAGE_SIZE) {
+                    log.info("Last page ({} stations). Import complete.", jsonNode.size());
+                    break;
+                }
+
+                try {
+                    Thread.sleep(IMPORT_PAGE_DELAY_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Import interrupted");
+                    break;
+                }
             }
-            
+
             log.info("Import completed: {} imported, {} updated, {} skipped", imported, updated, skipped);
             return new ImportResult(imported, updated, skipped);
-            
+
         } catch (JsonProcessingException e) {
             log.error("Error parsing JSON response from Open Charge Map for country {}", countryCode, e);
             throw new RuntimeException("Failed to parse JSON response from Open Charge Map API", e);
@@ -171,14 +216,28 @@ public class OpenChargeMapService {
                 log.error("Add 'openchargemap.api.key=your-key' to application.properties");
             }
             log.error("Error importing stations from Open Charge Map: {}", e.getMessage());
-            throw e; // Re-throw to be handled by StationImportService
+            throw e;
         } catch (Exception e) {
             log.error("Error importing stations from Open Charge Map", e);
-            throw e; // Re-throw to be handled by StationImportService
+            throw e;
         }
     }
 
-    private ChargingStation parseAndSaveStation(JsonNode stationNode) {
+    /** Result of saving one station: entity and whether it was newly inserted. */
+    private static final class SaveResult {
+        private final ChargingStation station;
+        private final boolean wasNew;
+
+        SaveResult(ChargingStation station, boolean wasNew) {
+            this.station = Objects.requireNonNull(station);
+            this.wasNew = wasNew;
+        }
+
+        ChargingStation getStation() { return station; }
+        boolean wasNew() { return wasNew; }
+    }
+
+    private SaveResult parseAndSaveStation(JsonNode stationNode) {
         String externalId = stationNode.has("ID") ? String.valueOf(stationNode.get("ID").asLong()) : null;
         if (externalId == null) {
             throw new IllegalArgumentException("Station missing ID");
@@ -216,7 +275,7 @@ public class OpenChargeMapService {
 
         // Check if station already exists
         ChargingStation existingStation = stationRepository.findByExternalId(externalId);
-        
+
         if (existingStation != null) {
             // Update existing station
             existingStation.setName(name);
@@ -229,13 +288,11 @@ public class OpenChargeMapService {
             existingStation.setMaxPowerKw(maxPowerKw);
             existingStation.setConnectorsJson(connectorsJson);
             existingStation.setUsageCost(usageCost != null ? usageCost : existingStation.getUsageCost());
-            // Keep existing status unless it's maintenance
             if (existingStation.getStatus() == ChargingStation.StationStatus.MAINTENANCE) {
                 existingStation.setStatus(ChargingStation.StationStatus.ACTIVE);
             }
-            return stationRepository.save(existingStation);
+            return new SaveResult(stationRepository.save(existingStation), false);
         } else {
-            // Create new station
             ChargingStation newStation = ChargingStation.builder()
                     .externalId(externalId)
                     .name(name)
@@ -250,7 +307,7 @@ public class OpenChargeMapService {
                     .usageCost(usageCost)
                     .status(ChargingStation.StationStatus.ACTIVE)
                     .build();
-            return stationRepository.save(newStation);
+            return new SaveResult(stationRepository.save(newStation), true);
         }
     }
 

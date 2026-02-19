@@ -71,6 +71,16 @@
           />
         </mat-form-field>
         <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Маршрут</mat-label>
+          <mat-select
+            [(ngModel)]="filterRoute"
+            (ngModelChange)="onFilterChange()"
+          >
+            <mat-option value="">Всички маршрути</mat-option>
+            <mat-option value="trakiya">Магистрала Тракия (A1)</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="filter-field">
           <mat-label>Статус</mat-label>
           <mat-select
             [(ngModel)]="filterStatus"
@@ -118,6 +128,7 @@
             [center]="mapCenter"
             [zoom]="mapZoom"
             [userLocation]="userLocation"
+            [highwayRoute]="highwayRouteForMap"
             (mapClick)="onMapClick()"
             (stationSelect)="onSelectStationFromMap($event)"
           />

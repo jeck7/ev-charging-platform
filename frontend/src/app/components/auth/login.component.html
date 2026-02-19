@@ -1,0 +1,49 @@
+<div class="auth-page">
+  <mat-card class="auth-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>{{ mode === 'login' ? 'login' : 'person_add' }}</mat-icon>
+        {{ mode === 'login' ? 'Вход' : 'Регистрация' }}
+      </mat-card-title>
+      <mat-card-subtitle>
+        {{ mode === 'login' ? 'Влезте в акаунта си' : 'Създайте акаунт' }}
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <form (ngSubmit)="onSubmit()" class="auth-form">
+        @if (error) {
+          <div class="error-message">{{ error }}</div>
+        }
+        @if (mode === 'register') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Име</mat-label>
+            <input matInput [(ngModel)]="name" name="name" required />
+          </mat-form-field>
+        }
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Имейл</mat-label>
+          <input matInput type="email" [(ngModel)]="email" name="email" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ mode === 'register' ? 'Парола (мин. 6 символа)' : 'Парола' }}</mat-label>
+          <input matInput [type]="hidePassword ? 'password' : 'text'" [(ngModel)]="password" name="password" required />
+          <button mat-icon-button matSuffix type="button" (click)="hidePassword = !hidePassword" [attr.aria-label]="hidePassword ? 'Покажи парола' : 'Скрий парола'">
+            <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+        </mat-form-field>
+        <div class="actions">
+          <button mat-raised-button color="primary" type="submit" [disabled]="loading">
+            @if (loading) {
+              <mat-spinner diameter="24"></mat-spinner>
+            } @else {
+              {{ mode === 'login' ? 'Вход' : 'Регистрация' }}
+            }
+          </button>
+          <button type="button" class="link-btn" (click)="setMode(mode === 'login' ? 'register' : 'login')">
+            {{ mode === 'login' ? 'Нямате акаунт? Регистрирайте се' : 'Вече имате акаунт? Влезте' }}
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

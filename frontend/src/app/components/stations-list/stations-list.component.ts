@@ -13,6 +13,8 @@ import { MatInputModule } from '@angular/material/input';
 import { StationService } from '../../services/station.service';
 import { StationImportService } from '../../services/station-import.service';
 import { ChargingStation } from '../../models/charging-station.model';
+import { TRAKIA_A1_ROUTE } from '../../data/highway-routes';
+import type { RoutePoint } from '../../data/highway-routes';
 import { StationsMapComponent } from '../stations-map/stations-map.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
@@ -53,7 +55,16 @@ export class StationsListComponent implements OnInit, OnDestroy {
 
   filterStatus: string = '';
   filterSearch: string = '';
+  filterRoute: '' | 'trakiya' = '';
   filterMinPower: number | null = null;
+
+  /** Максимално разстояние (km) от трасето на магистралата – станции в този коридор се показват */
+  private static readonly MAX_KM_FROM_ROUTE = 12;
+
+  /** Трасе на магистрала за картата (при избран маршрут) */
+  get highwayRouteForMap(): typeof TRAKIA_A1_ROUTE | null {
+    return this.filterRoute === 'trakiya' ? TRAKIA_A1_ROUTE : null;
+  }
 
   showImportPrompt = false;
   isImporting = false;
@@ -214,6 +225,25 @@ export class StationsListComponent implements OnInit, OnDestroy {
     return R * c;
   }
 
+  /** Минимално разстояние (km) от станция до трасето на магистралата (полилиния) */
+  private distanceFromStationToRoute(station: ChargingStation, route: RoutePoint[]): number {
+    if (route.length < 2 || station.latitude == null || station.longitude == null) return Infinity;
+    let minDist = Infinity;
+    const numSamples = 15;
+    for (let i = 0; i < route.length - 1; i++) {
+      const a = route[i];
+      const b = route[i + 1];
+      for (let k = 0; k <= numSamples; k++) {
+        const t = k / numSamples;
+        const lat = a[0] + t * (b[0] - a[0]);
+        const lng = a[1] + t * (b[1] - a[1]);
+        const d = this.distanceKm(station.latitude, station.longitude, lat, lng);
+        if (d < minDist) minDist = d;
+      }
+    }
+    return minDist;
+  }
+
   /** Изчисли разстоянието до станция от текущата локация */
   getStationDistance(station: ChargingStation): number | null {
     if (!this.userLocation || station.latitude == null || station.longitude == null) {
@@ -257,6 +287,13 @@ export class StationsListComponent implements OnInit, OnDestroy {
           (s.city || '').toLowerCase().includes(q) ||
           (s.country || '').toLowerCase().includes(q)
       );
+    }
+    if (this.filterRoute === 'trakiya') {
+      result = result.filter((s) => {
+        if (s.latitude == null || s.longitude == null) return false;
+        const dist = this.distanceFromStationToRoute(s, TRAKIA_A1_ROUTE);
+        return dist <= StationsListComponent.MAX_KM_FROM_ROUTE;
+      });
     }
     if (this.userLocation) {
       result = result

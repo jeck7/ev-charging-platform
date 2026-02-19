@@ -11,6 +11,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import type { ChargingStation } from '../../models/charging-station.model';
+import type { RoutePoint } from '../../data/highway-routes';
 import * as L from 'leaflet';
 
 @Component({
@@ -27,6 +28,8 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
   @Input() zoom = 6;
   /** Позиция на потребителя – показва се като маркер „Вие сте тук” */
   @Input() userLocation: { lat: number; lng: number } | null = null;
+  /** Трасе на магистрала за рисуване (напр. при избран филтър „Магистрала Тракия“) – [lat, lng][] */
+  @Input() highwayRoute: RoutePoint[] | null = null;
   /** Event когато се кликне върху картата (не върху маркер) */
   @Output() mapClick = new EventEmitter<void>();
   /** Event когато се кликне върху маркер на станция – изпраща id на станцията за селекция и чертане на маршрут */
@@ -34,6 +37,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
 
   private map: L.Map | null = null;
   private markersLayer: L.LayerGroup | null = null;
+  private highwayLayer: L.Polyline | null = null;
   private userLocationMarker: L.Marker | null = null;
   private routeLayer: L.Polyline | null = null;
   private routeStartMarker: L.Marker | null = null;
@@ -71,6 +75,9 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     }
     if (this.map && (changes['userLocation'] || changes['center'])) {
       this.updateUserLocationMarker();
+    }
+    if (this.map && changes['highwayRoute']) {
+      this.updateHighwayLayer();
     }
     // Обнови маршрута ако се промени избраната станция или локацията на потребителя
     if (this.map && changes['userLocation'] && this.selectedStationId) {
@@ -122,7 +129,8 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(this.map);
     this.markersLayer = L.layerGroup().addTo(this.map);
-    
+    this.updateHighwayLayer();
+
     // Добави event listener за кликване върху картата
     this.map.on('click', (e: L.LeafletMouseEvent) => {
       // Проверка дали кликването е върху маркер или popup
@@ -441,6 +449,36 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     if (this.routeEndMarker) {
       this.routeEndMarker.remove();
       this.routeEndMarker = null;
+    }
+  }
+
+  private updateHighwayLayer(): void {
+    if (!this.map) return;
+    if (this.highwayLayer) {
+      this.highwayLayer.remove();
+      this.highwayLayer = null;
+    }
+    if (this.highwayRoute && this.highwayRoute.length >= 2) {
+      const latLngs = this.highwayRoute.map((p) => [p[0], p[1]] as L.LatLngExpression);
+      this.highwayLayer = L.polyline(latLngs, {
+        color: '#ea580c',
+        weight: 5,
+        opacity: 0.85,
+        dashArray: '12, 8',
+      }).addTo(this.map);
+      let bounds = this.highwayLayer.getBounds();
+      const withCoords = this.stations.filter(
+        (s) => s.latitude != null && s.longitude != null && !isNaN(s.latitude) && !isNaN(s.longitude)
+      );
+      for (const s of withCoords) {
+        bounds = bounds.extend([s.latitude!, s.longitude!]);
+      }
+      this.map.fitBounds(bounds, {
+        padding: [40, 40],
+        maxZoom: 10,
+        animate: true,
+        duration: 0.5,
+      });
     }
   }
 

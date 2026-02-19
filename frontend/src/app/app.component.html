@@ -4,12 +4,41 @@
       <mat-icon>ev_station</mat-icon>
       eMobility EV Charging
     </a>
-    <span class="nav-spacer"></span>
-    <a routerLink="/admin" routerLinkActive="active" class="nav-link">
-      <mat-icon>admin_panel_settings</mat-icon>
-      Админ
-    </a>
     <span class="nav-subtitle">Driver Portal</span>
+    <span class="nav-spacer"></span>
+    @if (auth.isLoggedIn()) {
+      @if (auth.currentUser()?.role === 'ADMIN') {
+        <a routerLink="/admin" routerLinkActive="active" class="nav-link">
+          <mat-icon>admin_panel_settings</mat-icon>
+          Админ
+        </a>
+      }
+      <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
+        <mat-icon>account_circle</mat-icon>
+        {{ auth.currentUser()?.name || auth.currentUser()?.email }}
+      </button>
+      <mat-menu #userMenu="matMenu">
+        <button mat-menu-item routerLink="/">
+          <mat-icon>home</mat-icon>
+          <span>Начало</span>
+        </button>
+        @if (auth.currentUser()?.role === 'ADMIN') {
+          <button mat-menu-item routerLink="/admin">
+            <mat-icon>admin_panel_settings</mat-icon>
+            <span>Админ</span>
+          </button>
+        }
+        <button mat-menu-item (click)="auth.logout()">
+          <mat-icon>logout</mat-icon>
+          <span>Изход</span>
+        </button>
+      </mat-menu>
+    } @else {
+      <a routerLink="/login" class="nav-link">
+        <mat-icon>login</mat-icon>
+        Вход
+      </a>
+    }
   </mat-toolbar>
   <main class="main">
     <router-outlet></router-outlet>
