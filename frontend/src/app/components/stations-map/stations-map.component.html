@@ -1,1 +1,17 @@
-<div class="map-container" [id]="mapId"></div>
+<div class="map-wrapper">
+  @if (routeCount > 1) {
+    <div class="route-selector">
+      @for (i of routeIndices; track i) {
+        <button
+          type="button"
+          class="route-btn"
+          [class.active]="selectedRouteIndexForDisplay === i"
+          (click)="selectRouteByIndex(i)"
+        >
+          {{ i === 0 ? 'Основен' : 'Алтернатива ' + i }}
+        </button>
+      }
+    </div>
+  }
+  <div class="map-container" [id]="mapId"></div>
+</div>

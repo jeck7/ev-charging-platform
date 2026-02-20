@@ -1,5 +1,6 @@
 import {
   AfterViewInit,
+  ChangeDetectorRef,
   Component,
   EventEmitter,
   Input,
@@ -9,15 +10,15 @@ import {
   SimpleChanges,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import type { ChargingStation } from '../../models/charging-station.model';
 import type { RoutePoint } from '../../data/highway-routes';
+import { environment } from '../../../environments/environment';
 import * as L from 'leaflet';
 
 @Component({
   selector: 'app-stations-map',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule],
   templateUrl: './stations-map.component.html',
   styleUrl: './stations-map.component.css',
 })
@@ -39,13 +40,39 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
   private markersLayer: L.LayerGroup | null = null;
   private highwayLayer: L.Polyline | null = null;
   private userLocationMarker: L.Marker | null = null;
-  private routeLayer: L.Polyline | null = null;
+  /** Група с основен + алтернативни маршрути (полилинии) */
+  private routeLayerGroup: L.LayerGroup | null = null;
+  /** Видими полилинии на маршрутите – за стил основен/алтернативен */
+  private routeVisiblePolylines: L.Polyline[] = [];
+  /** Невидими широки линии върху маршрутите – само за клик (по-лесно улавяне) */
+  private routePolylines: L.Polyline[] = [];
+  private selectedRouteIndex = 0;
+  /** Брой маршрути (за шаблона – избор основен/алтернатива) */
+  get routeCount(): number {
+    return this.routeVisiblePolylines.length;
+  }
+  get selectedRouteIndexForDisplay(): number {
+    return this.selectedRouteIndex;
+  }
+  get routeIndices(): number[] {
+    const n = this.routeVisiblePolylines.length;
+    return n ? Array.from({ length: n }, (_, i) => i) : [];
+  }
   private routeStartMarker: L.Marker | null = null;
   private routeEndMarker: L.Marker | null = null;
   private markers: Map<number, L.Marker> = new Map();
   private defaultCenter: L.LatLngExpression = [42.6977, 23.3219]; // Sofia
 
   readonly mapId = 'stations-map-' + Math.random().toString(36).slice(2);
+
+  constructor(private cdr: ChangeDetectorRef) {}
+
+  /** Избор на маршрут като основен по индекс (от бутоните) */
+  selectRouteByIndex(i: number): void {
+    if (i < 0 || i >= this.routeVisiblePolylines.length) return;
+    this.selectedRouteIndex = i;
+    this.applyRouteStyles();
+  }
 
   ngAfterViewInit(): void {
     setTimeout(() => this.initMap(), 0);
@@ -112,7 +139,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       this.map = null;
     }
     this.markersLayer = null;
-    this.routeLayer = null;
+    this.routeLayerGroup = null;
   }
 
   private initMap(): void {
@@ -120,10 +147,15 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     const center: L.LatLngExpression = this.center
       ? [this.center.lat, this.center.lng] as L.LatLngTuple
       : this.defaultCenter;
-    this.map = L.map(this.mapId, {
-      center,
-      zoom: this.zoom,
-    });
+    const mapOptions: L.MapOptions = { center, zoom: this.zoom };
+    const canvasRenderer = (L as any).canvas;
+    if (canvasRenderer) {
+      mapOptions.renderer = canvasRenderer({ tolerance: 18 });
+    }
+    this.map = L.map(this.mapId, mapOptions);
+    this.map.createPane('routeHitPane');
+    const routeHitPane = this.map.getPane('routeHitPane');
+    if (routeHitPane) (routeHitPane as HTMLElement).style.zIndex = '450';
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -133,14 +165,15 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
 
     // Добави event listener за кликване върху картата
     this.map.on('click', (e: L.LeafletMouseEvent) => {
-      // Проверка дали кликването е върху маркер или popup
       const target = e.originalEvent.target as HTMLElement;
-      const isMarkerClick = target.closest('.leaflet-marker-icon') || 
+      const isMarkerClick = target.closest('.leaflet-marker-icon') ||
                            target.closest('.leaflet-popup') ||
                            target.closest('.station-marker');
-      
-      if (!isMarkerClick) {
-        // Кликнато е върху картата, не върху маркер
+      const isRouteClick = this.routePolylines.some((p) => {
+        const el = p.getElement();
+        return el && (el === target || el.contains(target as Node));
+      });
+      if (!isMarkerClick && !isRouteClick) {
         this.mapClick.emit();
       }
     });
@@ -270,12 +303,107 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       start: [this.userLocation.lat, this.userLocation.lng],
       end: [station.latitude!, station.longitude!]
     });
-    this.fetchRouteFromOSRM(
-      this.userLocation.lat,
-      this.userLocation.lng,
-      station.latitude!,
-      station.longitude!
-    );
+    const startLat = this.userLocation.lat;
+    const startLng = this.userLocation.lng;
+    const endLat = station.latitude!;
+    const endLng = station.longitude!;
+    if (environment.openRouteServiceApiKey) {
+      this.fetchRouteFromORS(startLat, startLng, endLat, endLng).catch(() => {
+        this.fetchRouteFromOSRM(startLat, startLng, endLat, endLng);
+      });
+    } else {
+      this.fetchRouteFromOSRM(startLat, startLng, endLat, endLng);
+    }
+  }
+
+  /**
+   * Маршрут чрез OpenRouteService – връща алтернативи по-често. Използва се при наличие на API ключ.
+   */
+  private fetchRouteFromORS(
+    startLat: number,
+    startLng: number,
+    endLat: number,
+    endLng: number
+  ): Promise<void> {
+    if (!this.map || !environment.openRouteServiceApiKey) {
+      return Promise.reject(new Error('No map or ORS key'));
+    }
+    const key = environment.openRouteServiceApiKey;
+    const body = {
+      coordinates: [[startLng, startLat], [endLng, endLat]] as [number, number][],
+      alternative_routes: { target_count: 2, share_factor: 0.6, weight_factor: 1.4 },
+    };
+    return fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+      method: 'POST',
+      headers: {
+        Authorization: key,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`ORS ${res.status}`);
+        return res.json();
+      })
+      .then((geojson: { type: string; features?: { geometry?: { type: string; coordinates?: number[][] } }[] }) => {
+        const features = geojson?.features;
+        if (!features?.length) throw new Error('No routes');
+        const group = L.layerGroup().addTo(this.map!);
+        const visiblePolylines: L.Polyline[] = [];
+        let fullBounds: L.LatLngBounds | null = null;
+        const startPoint = L.latLng(startLat, startLng);
+        const endPoint = L.latLng(endLat, endLng);
+        features.forEach((f, index) => {
+          const coordList = f.geometry?.coordinates;
+          if (!coordList?.length) return;
+          const coordinates = coordList.map((c) => [c[1], c[0]] as L.LatLngExpression);
+          const isMain = index === 0;
+          const visible = L.polyline(coordinates, {
+            color: isMain ? '#3f51b5' : '#0ea5e9',
+            weight: 5,
+            opacity: 0.9,
+            dashArray: isMain ? undefined : '14, 10',
+            smoothFactor: 1,
+          }).addTo(group);
+          visiblePolylines.push(visible);
+          const hit = L.polyline(coordinates, {
+            weight: 32,
+            opacity: 0.005,
+            color: '#000',
+            interactive: true,
+            pane: 'routeHitPane',
+          } as L.PolylineOptions).addTo(this.map!);
+          hit.on('click', (e: L.LeafletMouseEvent) => {
+            e.originalEvent.stopPropagation();
+            this.selectedRouteIndex = index;
+            this.applyRouteStyles();
+          });
+          hit.getElement()?.classList.add('route-line-selectable');
+          this.routePolylines.push(hit);
+          if (!fullBounds) {
+              const b = visible.getBounds();
+              fullBounds = L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+            }
+          else fullBounds.extend(visible.getBounds());
+        });
+        if (group.getLayers().length === 0 || !fullBounds) {
+          group.remove();
+          this.routePolylines.forEach((p) => p.remove());
+          this.routePolylines = [];
+          throw new Error('No geometry');
+        }
+        this.routeVisiblePolylines = visiblePolylines;
+        this.selectedRouteIndex = 0;
+        this.routeLayerGroup = group;
+        this.addRouteMarkers(startLat, startLng, endLat, endLng);
+        this.cdr.markForCheck();
+        setTimeout(() => {
+          if (this.map && fullBounds) {
+            const bounds = fullBounds.extend(startPoint).extend(endPoint);
+            this.map.fitBounds(bounds, { padding: [100, 100], maxZoom: 15, animate: true, duration: 0.6 });
+          }
+        }, 300);
+      });
   }
 
   private fetchRouteFromOSRM(
@@ -289,10 +417,10 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       return;
     }
     
-    // OSRM public server (може да се замени с собствен сървър)
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&alternatives=false`;
+    // OSRM: alternatives=3 пита за до 3 алтернативи (публичният сървър често връща само 1)
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&alternatives=3`;
     
-    console.log('Fetching route from OSRM:', osrmUrl);
+    console.log('Fetching route from OSRM (alternatives=3):', osrmUrl);
     
     fetch(osrmUrl, {
       method: 'GET',
@@ -308,49 +436,77 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       })
       .then((data) => {
         if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-          const route = data.routes[0];
-          if (route.geometry && route.geometry.coordinates) {
-            const coordinates = route.geometry.coordinates.map((coord: number[]) => [
+          const group = L.layerGroup().addTo(this.map!);
+          const visiblePolylines: L.Polyline[] = [];
+          let fullBounds: L.LatLngBounds | null = null;
+          const startPoint = L.latLng(startLat, startLng);
+          const endPoint = L.latLng(endLat, endLng);
+
+          data.routes.forEach((route: { geometry?: { coordinates: number[][] }; legs?: { geometry?: { coordinates: number[][] } }[] }, index: number) => {
+            let coords = route.geometry?.coordinates;
+            if (!coords?.length && route.legs?.length) {
+              coords = route.legs.flatMap((leg) => leg.geometry?.coordinates ?? []);
+            }
+            if (!coords?.length) return;
+            const coordinates = coords.map((coord: number[]) => [
               coord[1],
               coord[0],
-            ]); // OSRM връща [lng, lat], Leaflet очаква [lat, lng]
-            
-            // Create polyline with route geometry
-            const routePolyline = L.polyline(coordinates as L.LatLngExpression[], {
-              color: '#3f51b5',
+            ]) as L.LatLngExpression[];
+            const isMain = index === 0;
+            const visible = L.polyline(coordinates, {
+              color: isMain ? '#3f51b5' : '#0ea5e9',
               weight: 5,
-              opacity: 0.8,
+              opacity: 0.9,
+              dashArray: isMain ? undefined : '14, 10',
               smoothFactor: 1,
-            }).addTo(this.map!);
-            
-            this.routeLayer = routePolyline;
-            
-            // Add start and end markers for route
-            this.addRouteMarkers(startLat, startLng, endLat, endLng);
-            
-            // Fit map to show entire route + start/end points (след като е начертан)
-            setTimeout(() => {
-              if (this.map && routePolyline) {
-                // Създай bounds който включва маршрута + началната и крайната точка
-                const routeBounds = routePolyline.getBounds();
-                const startPoint = L.latLng(startLat, startLng);
-                const endPoint = L.latLng(endLat, endLng);
-                
-                // Разшири bounds да включва и двете точки
-                const fullBounds = routeBounds.extend(startPoint).extend(endPoint);
-                
-                this.map.fitBounds(fullBounds, {
-                  padding: [100, 100], // Увеличен padding за по-добра видимост
-                  maxZoom: 15, // Намален maxZoom за да се вижда по-голяма област
-                  animate: true,
-                  duration: 0.6,
-                });
-              }
-            }, 300);
-          } else {
-            console.warn('OSRM route missing geometry, using straight line');
+            }).addTo(group);
+            visiblePolylines.push(visible);
+            const hit = L.polyline(coordinates, {
+              weight: 32,
+              opacity: 0.005,
+              color: '#000',
+              interactive: true,
+              pane: 'routeHitPane',
+            } as L.PolylineOptions).addTo(this.map!);
+            hit.on('click', (e: L.LeafletMouseEvent) => {
+              e.originalEvent.stopPropagation();
+              this.selectedRouteIndex = index;
+              this.applyRouteStyles();
+            });
+            hit.getElement()?.classList.add('route-line-selectable');
+            this.routePolylines.push(hit);
+            if (!fullBounds) {
+              const b = visible.getBounds();
+              fullBounds = L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+            }
+            else fullBounds.extend(visible.getBounds());
+          });
+
+          if (group.getLayers().length === 0 || !fullBounds) {
+            group.remove();
+            this.routePolylines.forEach((p) => p.remove());
+            this.routePolylines = [];
             this.drawStraightLine(startLat, startLng, endLat, endLng);
+            return;
           }
+
+          this.routeVisiblePolylines = visiblePolylines;
+          this.selectedRouteIndex = 0;
+          this.routeLayerGroup = group;
+          this.addRouteMarkers(startLat, startLng, endLat, endLng);
+          this.cdr.markForCheck();
+
+          setTimeout(() => {
+            if (this.map && fullBounds) {
+              const bounds = fullBounds.extend(startPoint).extend(endPoint);
+              this.map.fitBounds(bounds, {
+                padding: [100, 100],
+                maxZoom: 15,
+                animate: true,
+                duration: 0.6,
+              });
+            }
+          }, 300);
         } else {
           console.warn('OSRM route failed:', data.code, 'using straight line');
           this.drawStraightLine(startLat, startLng, endLat, endLng);
@@ -361,6 +517,19 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
         // Fallback to straight line if API is unavailable
         this.drawStraightLine(startLat, startLng, endLat, endLng);
       });
+  }
+
+  /** Прилага стил основен/алтернативен според selectedRouteIndex */
+  private applyRouteStyles(): void {
+    this.routeVisiblePolylines.forEach((p, i) => {
+      const isMain = i === this.selectedRouteIndex;
+      p.setStyle({
+        color: isMain ? '#3f51b5' : '#0ea5e9',
+        weight: 5,
+        opacity: 0.9,
+        dashArray: isMain ? undefined : '14, 10',
+      });
+    });
   }
 
   private addRouteMarkers(
@@ -402,6 +571,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
   ): void {
     if (!this.map) return;
     
+    const group = L.layerGroup().addTo(this.map);
     const route = L.polyline(
       [
         [startLat, startLng],
@@ -413,9 +583,8 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
         opacity: 0.7,
         dashArray: '10, 10',
       }
-    ).addTo(this.map);
-    
-    this.routeLayer = route;
+    ).addTo(group);
+    this.routeLayerGroup = group;
     
     // Add route markers
     this.addRouteMarkers(startLat, startLng, endLat, endLng);
@@ -438,9 +607,13 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
   }
 
   private clearRoute(): void {
-    if (this.routeLayer) {
-      this.routeLayer.remove();
-      this.routeLayer = null;
+    this.routePolylines.forEach((p) => p.remove());
+    this.routePolylines = [];
+    this.routeVisiblePolylines = [];
+    this.selectedRouteIndex = 0;
+    if (this.routeLayerGroup) {
+      this.routeLayerGroup.remove();
+      this.routeLayerGroup = null;
     }
     if (this.routeStartMarker) {
       this.routeStartMarker.remove();
