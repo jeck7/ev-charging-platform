@@ -44,6 +44,49 @@
     <router-outlet></router-outlet>
   </main>
   <footer class="footer">
-    <p>eMobility EV Charging Platform &copy; 2026</p>
+    <div class="footer-inner">
+      <div class="footer-top">
+        <a routerLink="/" class="footer-logo">
+          <mat-icon>ev_station</mat-icon>
+          <span>eMobility EV Charging</span>
+        </a>
+        <p class="footer-tagline">Портал за зареждане на електропревозни средства. Намерете станции, цени и маршрути.</p>
+      </div>
+      <div class="footer-grid">
+        <div class="footer-col">
+          <h4>Навигация</h4>
+          <ul>
+            <li><a routerLink="/">Начало</a></li>
+            <li><a routerLink="/">Станции на картата</a></li>
+            @if (!auth.isLoggedIn()) {
+              <li><a routerLink="/login">Вход</a></li>
+            }
+            @if (auth.isLoggedIn() && auth.currentUser()?.role === 'ADMIN') {
+              <li><a routerLink="/admin">Админ панел</a></li>
+            }
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Платформа</h4>
+          <ul>
+            <li>Зарядни станции в България</li>
+            <li>Филтър по маршрут (напр. А1 Тракия)</li>
+            <li>Цени и типове конектори</li>
+            <li>Импорт от Open Charge Map</li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Полезно</h4>
+          <ul>
+            <li>Разстояние до станция</li>
+            <li>Статус: активна / поддръжка</li>
+            <li>Връзка към Google Maps и Waze</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">&copy; 2026 eMobility EV Charging Platform. Всички права запазени.</p>
+      </div>
+    </div>
   </footer>
 </div>

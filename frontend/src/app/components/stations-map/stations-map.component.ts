@@ -489,7 +489,8 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     // Изчисли разстоянието ако има userLocation
     const distance = this.getStationDistance(station);
     const distanceText = distance !== null ? `<p class="popup-distance">📍 ${this.formatDistance(distance)}</p>` : '';
-    
+    const priceHtml = this.formatPopupPrice(station);
+
     const popup = `
       <div class="station-popup">
         <strong>${this.escapeHtml(station.name)}</strong>
@@ -497,6 +498,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
         ${distanceText}
         <p class="popup-status">${station.status}</p>
         ${station.maxPowerKw ? `<p class="popup-power">${station.maxPowerKw} kW</p>` : ''}
+        ${priceHtml}
         <a href="/stations/${station.id}" class="popup-link">Виж детайли</a>
       </div>
     `;
@@ -538,6 +540,14 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2],
     });
+  }
+
+  /** Форматира цената за попъпа на картата (на локация или от конектор) */
+  private formatPopupPrice(station: ChargingStation): string {
+    const cost = station.usageCost?.trim() ||
+      station.connectors?.find((c) => c.usageCost?.trim())?.usageCost?.trim();
+    if (!cost) return '';
+    return `<p class="popup-price">Цена: ${this.escapeHtml(cost)}</p>`;
   }
 
   private escapeHtml(text: string): string {
