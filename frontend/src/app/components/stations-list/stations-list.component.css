@@ -54,21 +54,19 @@
 }
 
 .page-header {
-  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
 }
 
 .page-header h1 {
-  font-size: 1.75rem;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 600;
   color: #1a1a2e;
-  margin: 0 0 0.25rem;
-}
-
-.subtitle {
-  color: #6b7280;
   margin: 0;
-  font-size: 0.9rem;
 }
 
 .loading {
@@ -96,6 +94,21 @@
 .error-card p {
   margin: 0 0 1rem;
   color: #dc2626;
+}
+
+.search-card {
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+}
+
+.search-card .mat-mdc-card-content {
+  padding: 1rem 1.25rem;
+}
+
+.search-card .toolbar {
+  margin-bottom: 0;
 }
 
 .toolbar {
@@ -134,18 +147,80 @@
   color: white;
 }
 
-.toolbar .filters {
+.toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
   align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.toolbar .filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   flex: 1;
   min-width: 0;
+}
+
+.toolbar-compact .filters-compact {
+  gap: 0.4rem;
+}
+
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.filter-field-search {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 260px;
+}
+
+.route-row .filter-field-route {
+  width: 120px;
+  max-width: 140px;
 }
 
 .filter-field {
   width: 160px;
   font-size: 14px;
+}
+
+.filter-field-compact {
+  width: auto;
+  min-width: 0;
+}
+
+.filter-field-compact .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+.filter-field-route {
+  width: 120px;
+  max-width: 140px;
+}
+
+.route-btn-compact .mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  margin-right: 0.25rem;
+  vertical-align: middle;
+}
+
+.clear-route-btn {
+  width: 36px;
+  height: 36px;
+}
+
+.custom-route-error-inline {
+  color: #d32f2f;
+  font-size: 0.75rem;
+  flex-basis: 100%;
+  margin-top: -0.25rem;
 }
 
 .results-summary {

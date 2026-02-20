@@ -10,15 +10,15 @@ import { MatRippleModule } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { StationService } from '../../services/station.service';
 import { StationImportService } from '../../services/station-import.service';
 import { ChargingStation } from '../../models/charging-station.model';
-import { loadTrakiaA1Route } from '../../data/highway-routes';
 import type { RoutePoint } from '../../data/highway-routes';
 import { StationsMapComponent } from '../stations-map/stations-map.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-type ViewMode = 'split' | 'map' | 'list';
+type ViewMode = 'split' | 'map';
 
 @Component({
   selector: 'app-stations-list',
@@ -35,6 +35,7 @@ type ViewMode = 'split' | 'map' | 'list';
     MatFormFieldModule,
     MatSelectModule,
     MatInputModule,
+    MatTooltipModule,
     StationsMapComponent,
   ],
   templateUrl: './stations-list.component.html',
@@ -53,21 +54,22 @@ export class StationsListComponent implements OnInit, OnDestroy {
   locationLoading = false;
   locationError: string | null = null;
 
-  filterStatus: string = '';
   filterSearch: string = '';
-  filterRoute: '' | 'trakiya' = '';
   filterMinPower: number | null = null;
 
-  /** Заредено трасе Тракия (от JSON при нужда) */
-  trakiaRoute: RoutePoint[] | null = null;
-  routeLoading = false;
+  /** Пътувам от / до и заредено трасе за картата */
+  customRouteFrom = '';
+  customRouteTo = '';
+  customRoute: RoutePoint[] | null = null;
+  customRouteLoading = false;
+  customRouteError: string | null = null;
 
-  /** Максимално разстояние (km) от трасето на магистралата – станции до 10 km се показват */
+  /** Максимално разстояние (km) от трасето – станции до 10 km се показват */
   private static readonly MAX_KM_FROM_ROUTE = 10;
 
-  /** Трасе на магистрала за картата (при избран маршрут) */
+  /** Трасе за картата (маршрут от—до) */
   get highwayRouteForMap(): RoutePoint[] | null {
-    return this.filterRoute === 'trakiya' ? this.trakiaRoute : null;
+    return this.customRoute;
   }
 
   showImportPrompt = false;
@@ -272,11 +274,6 @@ export class StationsListComponent implements OnInit, OnDestroy {
 
   applyFilters(): void {
     let result = [...this.stations];
-    if (this.filterStatus) {
-      result = result.filter(
-        (s) => (s.status || '').toUpperCase() === this.filterStatus
-      );
-    }
     if (this.filterMinPower != null && this.filterMinPower > 0) {
       result = result.filter(
         (s) => (s.maxPowerKw ?? 0) >= this.filterMinPower!
@@ -292,10 +289,11 @@ export class StationsListComponent implements OnInit, OnDestroy {
           (s.country || '').toLowerCase().includes(q)
       );
     }
-    if (this.filterRoute === 'trakiya' && this.trakiaRoute && this.trakiaRoute.length >= 2) {
+    const routeForFilter = this.customRoute;
+    if (routeForFilter && routeForFilter.length >= 2) {
       result = result.filter((s) => {
         if (s.latitude == null || s.longitude == null) return false;
-        const dist = this.distanceFromStationToRoute(s, this.trakiaRoute!);
+        const dist = this.distanceFromStationToRoute(s, routeForFilter);
         return dist <= StationsListComponent.MAX_KM_FROM_ROUTE;
       });
     }
@@ -324,25 +322,66 @@ export class StationsListComponent implements OnInit, OnDestroy {
   }
 
   onFilterChange(): void {
-    if (this.filterRoute === 'trakiya') {
-      if (!this.trakiaRoute) {
-        this.routeLoading = true;
-        loadTrakiaA1Route()
-          .then((route) => {
-            this.trakiaRoute = route;
-            this.routeLoading = false;
-            this.applyFilters();
-          })
-          .catch(() => {
-            this.routeLoading = false;
+    this.applyFilters();
+  }
+
+  /** Изчисти маршрута от—до и покажи всички станции */
+  clearCustomRoute(): void {
+    this.customRoute = null;
+    this.customRouteError = null;
+    this.customRouteFrom = '';
+    this.customRouteTo = '';
+    this.applyFilters();
+  }
+
+  /** Геокодиране чрез Nominatim (OSM) */
+  private geocode(query: string): Promise<{ lat: number; lng: number }> {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+    return fetch(url, {
+      headers: { Accept: 'application/json', 'User-Agent': 'eMobility-EV-Charging/1.0' },
+    })
+      .then((r) => r.json())
+      .then((arr: { lat: string; lon: string }[]) => {
+        if (!Array.isArray(arr) || arr.length === 0) throw new Error(`Не е намерено: ${query}`);
+        const c = arr[0];
+        return { lat: parseFloat(c.lat), lng: parseFloat(c.lon) };
+      });
+  }
+
+  /** Зареди маршрут от—до: геокодиране + OSRM, след което филтрирай и начертай */
+  loadCustomRoute(): void {
+    const from = this.customRouteFrom.trim();
+    const to = this.customRouteTo.trim();
+    if (!from || !to) {
+      this.snackBar.open('Въведете „Пътувам от“ и „Пътувам до“.', undefined, { duration: 3000 });
+      return;
+    }
+    this.customRouteError = null;
+    this.customRouteLoading = true;
+    Promise.all([this.geocode(from), this.geocode(to)])
+      .then(([fromCoord, toCoord]) => {
+        const url = `https://router.project-osrm.org/route/v1/driving/${fromCoord.lng},${fromCoord.lat};${toCoord.lng},${toCoord.lat}?overview=full&geometries=geojson`;
+        return fetch(url, { headers: { Accept: 'application/json' } })
+          .then((r) => r.json())
+          .then((data: { code: string; routes?: { geometry?: { coordinates: number[][] } }[] }) => {
+            if (data.code !== 'Ok' || !data.routes?.length || !data.routes[0].geometry?.coordinates?.length) {
+              throw new Error('Маршрутът не е намерен');
+            }
+            const coords = data.routes[0].geometry.coordinates.map(
+              (c: number[]) => [c[1], c[0]] as RoutePoint
+            );
+            this.customRoute = coords;
             this.applyFilters();
           });
-        return;
-      }
-    } else {
-      this.trakiaRoute = null;
-    }
-    this.applyFilters();
+      })
+      .catch((err) => {
+        this.customRouteError = err?.message || 'Грешка при зареждане на маршрута';
+        this.customRoute = null;
+        this.applyFilters();
+      })
+      .finally(() => {
+        this.customRouteLoading = false;
+      });
   }
 
   setViewMode(mode: ViewMode): void {
@@ -360,10 +399,6 @@ export class StationsListComponent implements OnInit, OnDestroy {
     }
     this.selectedStationId = station.id;
     
-    // If in list-only view, switch to split or map view to show the station
-    if (this.viewMode === 'list') {
-      this.viewMode = 'split';
-    }
   }
 
   onMapClick(): void {
