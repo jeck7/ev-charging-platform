@@ -1,7 +1,7 @@
 .stations-container {
   max-width: 2000px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 10px 1rem;
   height: calc(100vh - 120px);
   display: flex;
   flex-direction: column;
@@ -265,16 +265,15 @@
 }
 
 .connector-toggle {
-  flex: 1;
-  min-width: 0;
-  display: flex;
+  display: inline-flex;
+  gap: 0;
 }
 
 .connector-toggle .view-btn {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 0.8125rem;
-  padding: 0.4rem 0.5rem;
+  padding: 0.4rem 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
