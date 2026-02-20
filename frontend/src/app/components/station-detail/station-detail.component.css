@@ -181,18 +181,25 @@
 }
 
 .connector-item {
-  padding: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
   font-size: 0.9375rem;
   color: #4b5563;
+  border-bottom: 1px solid #f3f4f6;
 }
 
-.connector-type {
-  font-weight: 600;
+.connector-item:last-child {
+  border-bottom: none;
+}
+
+.connector-text {
+  flex: 1;
+}
+
+.connector-text strong {
   color: #1f2937;
-}
-
-.connector-details {
-  margin-left: 0.25rem;
 }
 
 .connectors-empty {

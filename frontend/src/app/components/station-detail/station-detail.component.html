@@ -39,7 +39,7 @@
         <mat-card-content>
           <p class="address">
             <mat-icon>location_on</mat-icon>
-            {{ station.address }}{{ station.city ? ', ' + station.city : '' }}{{ station.country ? ', ' + station.country : '' }}
+            {{ station.address || (station.city ? station.city + (station.country ? ', ' + station.country : '') : (station.country || '')) }}
           </p>
 
           @if (station.latitude != null && station.longitude != null) {
@@ -76,13 +76,11 @@
               <ul class="connectors-list">
                 @for (conn of station.connectors; track $index) {
                   <li class="connector-item">
-                    <span class="connector-type">{{ conn.type }}</span>
-                    <span class="connector-details">
-                      конектор с максимална мощност <strong>{{ conn.powerKw }} kW</strong>
+                    <app-connector-icon [type]="conn.type" />
+                    <span class="connector-text">
+                      <strong>{{ conn.type }}</strong> конектор с максимална мощност <strong>{{ conn.powerKw }} kW</strong>
                       @if (conn.usageCost || station.usageCost) {
-                        и цена {{ conn.usageCost ?? station.usageCost }}.
-                      } @else {
-                        .
+                        и цена {{ conn.usageCost ?? station.usageCost }}
                       }
                     </span>
                   </li>
@@ -90,7 +88,7 @@
               </ul>
             } @else {
               <p class="connectors-empty">
-                Няма въведени данни за конектори за тази станция. Данните се попълват при импорт от Open Charge Map — импортирайте станциите отново от <a routerLink="/admin">админ панела</a>, за да се покажат тип конектор (CCS, Type 2 и др.), мощност и цена (напр. 0.39 EUR / kWh). Цените в Open Charge Map често липсват; при нужда може да се зададе цена за локацията чрез API.
+                Няма въведени данни за конектори за тази станция. Данните се попълват при импорт от Open Charge Map или Fines — импортирайте станциите от <a routerLink="/admin">админ панела</a>. Цените можете да попълните чрез «Обогатяване на цени (Chargeprice)».
               </p>
             }
           </section>

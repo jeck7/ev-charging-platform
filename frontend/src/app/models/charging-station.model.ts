@@ -10,8 +10,8 @@ export interface ChargingStation {
   address: string;
   city: string;
   country: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   status: string;
   operator?: string;
   maxPowerKw?: number;

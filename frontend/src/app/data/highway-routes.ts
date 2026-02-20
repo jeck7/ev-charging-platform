@@ -1,21 +1,27 @@
 /**
- * Приблизителни точки по магистрали за трасиране на картата.
+ * Точки по магистрали за трасиране на картата (следват реалното трасе по OSM).
  * Формат: [lat, lng][] (Leaflet order).
+ * Трасето се зарежда от JSON при нужда.
  */
 export type RoutePoint = [number, number];
 
-/** Магистрала Тракия (A1) – София → Бургас (основни възли) */
-export const TRAKIA_A1_ROUTE: RoutePoint[] = [
-  [42.698, 23.322],   // София (запад)
-  [42.43, 23.82],    // Ихтиман
-  [42.30, 23.85],    // Костенец
-  [42.19, 24.33],    // Пазарджик
-  [42.135, 24.75],   // Пловдив
-  [42.10, 25.20],    // Оризово / Първомай
-  [42.20, 25.33],    // Чирпан
-  [42.43, 25.65],    // Стара Загора
-  [42.48, 26.00],    // Нова Загора
-  [42.48, 26.50],    // Ямбол
-  [42.65, 26.98],    // Карнобат
-  [42.504, 27.463],  // Бургас
-];
+const TRAKIA_A1_JSON = 'assets/routes/trakia-a1-route.json';
+
+let trakiaRouteCache: RoutePoint[] | null = null;
+
+/**
+ * Зарежда трасето на магистрала Тракия (A1) от JSON. Кешира резултата.
+ */
+export function loadTrakiaA1Route(): Promise<RoutePoint[]> {
+  if (trakiaRouteCache) return Promise.resolve(trakiaRouteCache);
+  return fetch(TRAKIA_A1_JSON)
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then((data: number[][]) => {
+      if (!Array.isArray(data)) throw new Error('Invalid route format');
+      trakiaRouteCache = data.map((p) => [p[0], p[1]] as RoutePoint);
+      return trakiaRouteCache;
+    });
+}

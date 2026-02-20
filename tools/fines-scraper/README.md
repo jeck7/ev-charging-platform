@@ -22,7 +22,15 @@ cd tools/fines-scraper
 node scrape.js
 ```
 
-Изходът е един ред JSON (масив от обекти с полета: name, address, city, country, latitude, longitude, maxPowerKw и др.).
+Изходът е един ред JSON (масив от обекти с полета: name, address, city, country, latitude, longitude и др.).
+
+За отстраняване на грешки (да видиш кои JSON заявки прави страницата):
+
+```bash
+DEBUG=1 node scrape.js
+# или
+node scrape.js --debug
+```
 
 ## Импорт чрез backend
 

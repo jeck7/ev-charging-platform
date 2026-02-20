@@ -58,15 +58,42 @@ public class FinesScraperService {
                 log.warn("Scraper exited with {}: {}", p.exitValue(), output);
                 return ScrapeResult.error("Scraper failed: " + (output.length() > 500 ? output.substring(0, 500) + "..." : output));
             }
-            return importScrapedOutput(output.trim());
+            String jsonLine = extractJsonArrayLine(output);
+            if (jsonLine == null || jsonLine.isEmpty()) {
+                return ScrapeResult.error("Scraper output contained no JSON array. Output length: " + output.length());
+            }
+            return importScrapedOutput(jsonLine);
         } catch (Exception e) {
             log.error("Fines scraper error", e);
             return ScrapeResult.error(e.getMessage());
         }
     }
 
+    /**
+     * Извлича един ред с JSON масив от изхода на скрейпъра.
+     * Ако целият изход е валиден JSON масив, използва се той.
+     * Иначе се търси последният ред, който започва с "[" и завършва с "]" (изход от console.log).
+     * Така debug съобщения на stderr (при redirectErrorStream) не развалят парсването.
+     */
+    private String extractJsonArrayLine(String output) {
+        if (output == null) return null;
+        String trimmed = output.trim();
+        if (trimmed.isEmpty()) return null;
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            return trimmed;
+        }
+        String[] lines = output.split("\\r?\\n");
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i].trim();
+            if (line.startsWith("[") && line.endsWith("]")) {
+                return line;
+            }
+        }
+        return null;
+    }
+
     private ScrapeResult importScrapedOutput(String jsonLine) {
-        if (jsonLine.isEmpty()) {
+        if (jsonLine == null || jsonLine.isEmpty()) {
             return ScrapeResult.error("Scraper returned empty output");
         }
         try {
@@ -80,7 +107,12 @@ public class FinesScraperService {
                     ChargingStation s = mapToStation(item);
                     if (s == null) continue;
                     ChargingStation existing = stationRepository.findByExternalId(s.getExternalId());
+                    if (existing == null) {
+                        existing = stationRepository.findFirstByLatitudeAndLongitudeAndExternalIdStartingWith(
+                                s.getLatitude(), s.getLongitude(), "fines-scrape-").orElse(null);
+                    }
                     if (existing != null) {
+                        existing.setExternalId(s.getExternalId());
                         existing.setName(s.getName());
                         existing.setAddress(s.getAddress());
                         existing.setCity(s.getCity());
@@ -107,11 +139,23 @@ public class FinesScraperService {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private ChargingStation mapToStation(Map<String, Object> m) {
         Object lat = m.get("latitude");
         Object lng = m.get("longitude");
         if (lat == null) lat = m.get("lat");
         if (lng == null) lng = m.get("lng");
+        if (lat == null || lng == null) {
+            Object geom = m.get("geometry");
+            if (geom instanceof Map) {
+                Object coords = ((Map<String, Object>) geom).get("coordinates");
+                if (coords instanceof List && ((List<?>) coords).size() >= 2) {
+                    List<?> c = (List<?>) coords;
+                    if (lng == null) lng = c.get(0);
+                    if (lat == null) lat = c.get(1);
+                }
+            }
+        }
         BigDecimal latitude = toBigDecimal(lat);
         BigDecimal longitude = toBigDecimal(lng);
         if (latitude == null || longitude == null) return null;
@@ -121,12 +165,13 @@ public class FinesScraperService {
         String city = String.valueOf(m.getOrDefault("city", "")).trim();
         String country = String.valueOf(m.getOrDefault("country", "BG")).trim();
         BigDecimal maxPowerKw = toBigDecimal(m.get("maxPowerKw"));
-        String externalId = "fines-scrape-" + latitude + "-" + longitude + "-" + name.hashCode();
+        if (maxPowerKw == null) maxPowerKw = BigDecimal.valueOf(120);
+        String externalId = "fines-scrape-" + latitude.stripTrailingZeros().toPlainString() + "-" + longitude.stripTrailingZeros().toPlainString();
         String connectorsJson = null;
         if (maxPowerKw != null) {
             try {
                 connectorsJson = objectMapper.writeValueAsString(List.of(
-                        Map.of("type", "CCS", "powerKw", maxPowerKw.doubleValue())
+                        Map.of("type", "CCS", "powerKw", maxPowerKw.doubleValue(), "usageCost", "0.39 EUR / kWh")
                 ));
             } catch (Exception ignored) {}
         }

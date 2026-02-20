@@ -13,7 +13,7 @@ import { MatInputModule } from '@angular/material/input';
 import { StationService } from '../../services/station.service';
 import { StationImportService } from '../../services/station-import.service';
 import { ChargingStation } from '../../models/charging-station.model';
-import { TRAKIA_A1_ROUTE } from '../../data/highway-routes';
+import { loadTrakiaA1Route } from '../../data/highway-routes';
 import type { RoutePoint } from '../../data/highway-routes';
 import { StationsMapComponent } from '../stations-map/stations-map.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -58,12 +58,16 @@ export class StationsListComponent implements OnInit, OnDestroy {
   filterRoute: '' | 'trakiya' = '';
   filterMinPower: number | null = null;
 
-  /** Максимално разстояние (km) от трасето на магистралата – станции в този коридор се показват */
-  private static readonly MAX_KM_FROM_ROUTE = 12;
+  /** Заредено трасе Тракия (от JSON при нужда) */
+  trakiaRoute: RoutePoint[] | null = null;
+  routeLoading = false;
+
+  /** Максимално разстояние (km) от трасето на магистралата – станции до 10 km се показват */
+  private static readonly MAX_KM_FROM_ROUTE = 10;
 
   /** Трасе на магистрала за картата (при избран маршрут) */
-  get highwayRouteForMap(): typeof TRAKIA_A1_ROUTE | null {
-    return this.filterRoute === 'trakiya' ? TRAKIA_A1_ROUTE : null;
+  get highwayRouteForMap(): RoutePoint[] | null {
+    return this.filterRoute === 'trakiya' ? this.trakiaRoute : null;
   }
 
   showImportPrompt = false;
@@ -288,10 +292,10 @@ export class StationsListComponent implements OnInit, OnDestroy {
           (s.country || '').toLowerCase().includes(q)
       );
     }
-    if (this.filterRoute === 'trakiya') {
+    if (this.filterRoute === 'trakiya' && this.trakiaRoute && this.trakiaRoute.length >= 2) {
       result = result.filter((s) => {
         if (s.latitude == null || s.longitude == null) return false;
-        const dist = this.distanceFromStationToRoute(s, TRAKIA_A1_ROUTE);
+        const dist = this.distanceFromStationToRoute(s, this.trakiaRoute!);
         return dist <= StationsListComponent.MAX_KM_FROM_ROUTE;
       });
     }
@@ -320,6 +324,24 @@ export class StationsListComponent implements OnInit, OnDestroy {
   }
 
   onFilterChange(): void {
+    if (this.filterRoute === 'trakiya') {
+      if (!this.trakiaRoute) {
+        this.routeLoading = true;
+        loadTrakiaA1Route()
+          .then((route) => {
+            this.trakiaRoute = route;
+            this.routeLoading = false;
+            this.applyFilters();
+          })
+          .catch(() => {
+            this.routeLoading = false;
+            this.applyFilters();
+          });
+        return;
+      }
+    } else {
+      this.trakiaRoute = null;
+    }
     this.applyFilters();
   }
 

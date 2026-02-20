@@ -109,9 +109,12 @@
     </div>
 
     <div class="results-summary">
-      @if (locationLoading) {
+      @if (routeLoading) {
+        <span class="location-status"><mat-icon class="spin">route</mat-icon> Зареждане на трасе...</span>
+      }
+      @if (locationLoading && !routeLoading) {
         <span class="location-status"><mat-icon class="spin">my_location</mat-icon> Определяне на вашата локация...</span>
-      } @else if (userLocation) {
+      } @else if (userLocation && !routeLoading) {
         <span class="location-status location-ok"><mat-icon>my_location</mat-icon> Сортирани по близост до вас</span>
       } @else if (locationError) {
         <span class="location-status location-warn">{{ locationError }}</span>
@@ -167,10 +170,9 @@
                     <mat-card-content>
                       <p class="address">
                         <mat-icon>location_on</mat-icon>
-                        {{ station.address }}, {{ station.city }}
+                        {{ station.address }}
                       </p>
                       <div class="station-meta">
-                        <p class="country">{{ station.country }}</p>
                         @if (getStationDistance(station) !== null) {
                           <p class="distance">
                             <mat-icon>straighten</mat-icon>

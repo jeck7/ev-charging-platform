@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { StationService } from '../../services/station.service';
 import { ChargingStation } from '../../models/charging-station.model';
+import { ConnectorIconComponent } from '../connector-icon/connector-icon.component';
 import * as L from 'leaflet';
 
 @Component({
@@ -19,6 +20,7 @@ import * as L from 'leaflet';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    ConnectorIconComponent,
   ],
   templateUrl: './station-detail.component.html',
   styleUrl: './station-detail.component.css',

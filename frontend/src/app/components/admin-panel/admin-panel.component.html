@@ -70,9 +70,15 @@
             [disabled]="isFinesScraping"
             title="Скрапиране на finescharging.com/locations и импорт в БД (изисква Node + Playwright)"
           >
-            <mat-icon>link</mat-icon>
-            Fines (скрапинг)
+            <mat-spinner *ngIf="isFinesScraping" diameter="20" class="btn-spinner"></mat-spinner>
+            <mat-icon *ngIf="!isFinesScraping">link</mat-icon>
+            {{ isFinesScraping ? 'Обработка...' : 'Fines (скрапинг)' }}
           </button>
+        </div>
+
+        <div class="fines-scrape-status" *ngIf="isFinesScraping">
+          <mat-spinner diameter="24"></mat-spinner>
+          <span>Скрапинг и импорт в процес. Моля изчакайте (може да отнеме до минута).</span>
         </div>
 
         <div class="fines-scrape-result" *ngIf="finesScrapeResult">

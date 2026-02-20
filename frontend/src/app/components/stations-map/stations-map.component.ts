@@ -190,7 +190,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     // Auto-center if only one station or if selected
     if (validStations.length === 1 && this.selectedStationId == null) {
       this.map.setView(
-        [validStations[0].latitude, validStations[0].longitude],
+        [validStations[0].latitude!, validStations[0].longitude!],
         14
       );
     } else if (this.selectedStationId != null) {
@@ -220,7 +220,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     } else {
       // Zoom and center on selected station only if no user location
       this.map.setView(
-        [station.latitude, station.longitude],
+        [station.latitude!, station.longitude!],
         15,
         {
           animate: true,
@@ -268,13 +268,13 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     // fitBounds ще се направи след като маршрутът се зареди
     console.log('Calling fetchRouteFromOSRM', {
       start: [this.userLocation.lat, this.userLocation.lng],
-      end: [station.latitude, station.longitude]
+      end: [station.latitude!, station.longitude!]
     });
     this.fetchRouteFromOSRM(
       this.userLocation.lat,
       this.userLocation.lng,
-      station.latitude,
-      station.longitude
+      station.latitude!,
+      station.longitude!
     );
   }
 
@@ -484,7 +484,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
 
   private createMarker(station: ChargingStation, isSelected: boolean = false): L.Marker {
     const icon = this.getIconForStation(station, isSelected);
-    const marker = L.marker([station.latitude, station.longitude], { icon });
+    const marker = L.marker([station.latitude!, station.longitude!], { icon });
     
     // Изчисли разстоянието ако има userLocation
     const distance = this.getStationDistance(station);
@@ -493,7 +493,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     const popup = `
       <div class="station-popup">
         <strong>${this.escapeHtml(station.name)}</strong>
-        <p class="popup-address">${this.escapeHtml(station.address || '')}, ${this.escapeHtml(station.city || '')}</p>
+        <p class="popup-address">${this.escapeHtml(station.address || '')}</p>
         ${distanceText}
         <p class="popup-status">${station.status}</p>
         ${station.maxPowerKw ? `<p class="popup-power">${station.maxPowerKw} kW</p>` : ''}
@@ -574,8 +574,8 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     return this.distanceKm(
       this.userLocation.lat,
       this.userLocation.lng,
-      station.latitude,
-      station.longitude
+      station.latitude!,
+      station.longitude!
     );
   }
 
