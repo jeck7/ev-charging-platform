@@ -333,7 +333,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       coordinates: [[startLng, startLat], [endLng, endLat]] as [number, number][],
       alternative_routes: { target_count: 2, share_factor: 0.6, weight_factor: 1.4 },
     };
-    return fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+    return fetch('/api/ors/v2/directions/driving-car/geojson', {
       method: 'POST',
       headers: {
         Authorization: key,
@@ -418,7 +418,7 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     }
     
     // OSRM: alternatives=3 пита за до 3 алтернативи (публичният сървър често връща само 1)
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&alternatives=3`;
+    const osrmUrl = `/api/osrm/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&alternatives=3`;
     
     console.log('Fetching route from OSRM (alternatives=3):', osrmUrl);
     
@@ -693,25 +693,23 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
 
   private getIconForStation(station: ChargingStation, isSelected: boolean = false): L.DivIcon {
     const status = (station.status || '').toUpperCase();
-    let color = '#6b7280';
-    if (status === 'ACTIVE') color = '#22c55e';
-    else if (status === 'MAINTENANCE') color = '#eab308';
-    else if (status === 'INACTIVE') color = '#ef4444';
+    let color = '#374151';
+    if (status === 'ACTIVE') color = '#15803d';
+    else if (status === 'MAINTENANCE') color = '#a16207';
+    else if (status === 'INACTIVE') color = '#b91c1c';
     
-    // Make selected marker larger and with highlight border
     const baseSize = station.maxPowerKw && station.maxPowerKw >= 150 ? 28 : 24;
     const size = isSelected ? baseSize + 6 : baseSize;
-    const borderColor = isSelected ? '#3f51b5' : 'white';
-    const borderWidth = isSelected ? 3 : 2;
-    const shadow = isSelected 
-      ? '0 2px 8px rgba(63, 81, 181, 0.5)' 
-      : '0 1px 3px rgba(0,0,0,0.3)';
-    
+    const anchor = size / 2;
+    const border = isSelected ? '2px solid #2563eb' : '2px solid rgba(0,0,0,0.25)';
+    const shadow = '0 2px 6px rgba(0,0,0,0.4)';
+    const bg = 'background:#fff;border-radius:50%;border:' + border + ';box-shadow:' + shadow + ';';
+    const html = `<span class="station-marker-icon" style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;${bg}"><span class="material-icons" style="font-size:${Math.round(size * 0.7)}px;color:${color};line-height:1;">ev_station</span></span>`;
     return L.divIcon({
       className: 'station-marker' + (isSelected ? ' selected' : ''),
-      html: `<span style="background-color:${color};width:${size}px;height:${size}px;border-radius:50%;border:${borderWidth}px solid ${borderColor};box-shadow:${shadow};display:block;"></span>`,
+      html,
       iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
+      iconAnchor: [anchor, anchor],
     });
   }
 

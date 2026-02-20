@@ -1,11 +1,4 @@
 <div class="stations-container">
-  <header class="page-header">
-    <h1>Зарядни станции</h1>
-    <div class="view-toggle">
-      <button type="button" class="view-btn" [class.active]="viewMode === 'split'" (click)="viewMode = 'split'">Карта + списък</button>
-      <button type="button" class="view-btn" [class.active]="viewMode === 'map'" (click)="viewMode = 'map'">Карта</button>
-    </div>
-  </header>
 
   @if (loading) {
     <div class="loading">
@@ -58,51 +51,52 @@
     }
     <mat-card class="search-card">
       <mat-card-content>
-        <div class="toolbar toolbar-compact">
-          <div class="filters filters-compact">
-            <div class="filters-row">
-              <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-search">
-                <mat-label>Търсене</mat-label>
-                <input matInput [(ngModel)]="filterSearch" (ngModelChange)="onFilterChange()" placeholder="Име, адрес, град..." />
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="filter-field filter-field-compact">
-                <mat-label>Мин. kW</mat-label>
-                <mat-select [(ngModel)]="filterMinPower" (ngModelChange)="onFilterChange()">
-                  <mat-option [value]="null">—</mat-option>
-                  <mat-option [value]="22">≥ 22</mat-option>
-                  <mat-option [value]="50">≥ 50</mat-option>
-                  <mat-option [value]="100">≥ 100</mat-option>
-                  <mat-option [value]="150">≥ 150</mat-option>
-                </mat-select>
-              </mat-form-field>
+        <h1 class="search-card-title">Търсене на Зарядни станции</h1>
+        <div class="toolbar toolbar-compact toolbar-single-row">
+          <div class="filters filters-compact filters-single-row">
+            <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-search">
+              <mat-label>Търсене</mat-label>
+              <input matInput [(ngModel)]="filterSearch" (ngModelChange)="onFilterChange()" placeholder="Име, адрес, град..." />
+            </mat-form-field>
+            <div class="min-kw-filter">
+              <span class="min-kw-label">Мин. kW</span>
+              <div class="view-toggle min-kw-toggle">
+                <button type="button" class="view-btn" [class.active]="filterMinPower === null" (click)="filterMinPower = null; onFilterChange()">—</button>
+                <button type="button" class="view-btn" [class.active]="filterMinPower === 22" (click)="filterMinPower = 22; onFilterChange()">≥ 22</button>
+                <button type="button" class="view-btn" [class.active]="filterMinPower === 50" (click)="filterMinPower = 50; onFilterChange()">≥ 50</button>
+                <button type="button" class="view-btn" [class.active]="filterMinPower === 100" (click)="filterMinPower = 100; onFilterChange()">≥ 100</button>
+                <button type="button" class="view-btn" [class.active]="filterMinPower === 150" (click)="filterMinPower = 150; onFilterChange()">≥ 150</button>
+              </div>
             </div>
-            <div class="filters-row route-row">
-              <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-route">
-                <mat-label>От</mat-label>
-                <input matInput [(ngModel)]="customRouteFrom" placeholder="напр. София" (keyup.enter)="loadCustomRoute()" />
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-route">
-                <mat-label>До</mat-label>
-                <input matInput [(ngModel)]="customRouteTo" placeholder="напр. Пловдив" (keyup.enter)="loadCustomRoute()" />
-              </mat-form-field>
-              <button mat-stroked-button color="primary" class="route-btn-compact" (click)="loadCustomRoute()" [disabled]="customRouteLoading">
-                @if (customRouteLoading) {
-                  <mat-icon class="spin">hourglass_empty</mat-icon>
-                } @else {
-                  <mat-icon>route</mat-icon>
-                }
-                Маршрут
-              </button>
-              @if (customRoute) {
-                <button mat-icon-button type="button" class="clear-route-btn" (click)="clearCustomRoute()" matTooltip="Изчисти маршрут">
-                  <mat-icon>close</mat-icon>
-                </button>
+            <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-route">
+              <mat-label>От</mat-label>
+              <input matInput [(ngModel)]="customRouteFrom" placeholder="напр. София" (keyup.enter)="loadCustomRoute()" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-route">
+              <mat-label>До</mat-label>
+              <input matInput [(ngModel)]="customRouteTo" placeholder="напр. Пловдив" (keyup.enter)="loadCustomRoute()" />
+            </mat-form-field>
+            <button mat-stroked-button color="primary" class="route-btn-compact" (click)="loadCustomRoute()" [disabled]="customRouteLoading">
+              @if (customRouteLoading) {
+                <mat-icon class="spin">hourglass_empty</mat-icon>
+              } @else {
+                <mat-icon>route</mat-icon>
               }
-            </div>
+              Маршрут
+            </button>
+            @if (customRoute) {
+              <button mat-icon-button type="button" class="clear-route-btn" (click)="clearCustomRoute()" matTooltip="Изчисти маршрут">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+            @if (customRouteError) {
+              <span class="custom-route-error-inline">{{ customRouteError }}</span>
+            }
           </div>
-          @if (customRouteError) {
-            <span class="custom-route-error-inline">{{ customRouteError }}</span>
-          }
+          <div class="search-card-view-toggle view-toggle">
+            <button type="button" class="view-btn" [class.active]="viewMode === 'split'" (click)="viewMode = 'split'">Карта + списък</button>
+            <button type="button" class="view-btn" [class.active]="viewMode === 'map'" (click)="viewMode = 'map'">Карта</button>
+          </div>
         </div>
       </mat-card-content>
     </mat-card>

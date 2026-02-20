@@ -104,10 +104,18 @@
   text-decoration: underline;
 }
 
-/* Hide default Leaflet marker */
+/* Station markers: icon instead of circle */
 ::ng-deep .station-marker {
   background: none !important;
   border: none !important;
+}
+
+::ng-deep .station-marker .station-marker-icon {
+  font-family: 'Material Icons', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal;
+  text-rendering: optimizeLegibility;
 }
 
 ::ng-deep .station-marker.selected {

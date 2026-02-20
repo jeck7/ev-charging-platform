@@ -8,7 +8,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatRippleModule } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { StationService } from '../../services/station.service';
@@ -33,7 +32,6 @@ type ViewMode = 'split' | 'map';
     MatIconModule,
     MatRippleModule,
     MatFormFieldModule,
-    MatSelectModule,
     MatInputModule,
     MatTooltipModule,
     StationsMapComponent,
@@ -336,7 +334,7 @@ export class StationsListComponent implements OnInit, OnDestroy {
 
   /** Геокодиране чрез Nominatim (OSM) */
   private geocode(query: string): Promise<{ lat: number; lng: number }> {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+    const url = `/api/nominatim/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
     return fetch(url, {
       headers: { Accept: 'application/json', 'User-Agent': 'eMobility-EV-Charging/1.0' },
     })
@@ -360,7 +358,7 @@ export class StationsListComponent implements OnInit, OnDestroy {
     this.customRouteLoading = true;
     Promise.all([this.geocode(from), this.geocode(to)])
       .then(([fromCoord, toCoord]) => {
-        const url = `https://router.project-osrm.org/route/v1/driving/${fromCoord.lng},${fromCoord.lat};${toCoord.lng},${toCoord.lat}?overview=full&geometries=geojson`;
+        const url = `/api/osrm/route/v1/driving/${fromCoord.lng},${fromCoord.lat};${toCoord.lng},${toCoord.lat}?overview=full&geometries=geojson`;
         return fetch(url, { headers: { Accept: 'application/json' } })
           .then((r) => r.json())
           .then((data: { code: string; routes?: { geometry?: { coordinates: number[][] } }[] }) => {
