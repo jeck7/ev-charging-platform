@@ -39,29 +39,86 @@ function isLikelyLocationsJson(body) {
 }
 
 function parsePopupText(raw) {
-  if (!raw || typeof raw !== 'string') return { name: 'Fines Charging', address: '', city: '', maxPowerKw: null };
+  if (!raw || typeof raw !== 'string') return { name: 'Fines Charging', address: '', city: '', maxPowerKw: null, connectors: [] };
+  const parsed = parsePopupTextWithStations(raw);
+  return {
+    name: parsed.name,
+    address: parsed.address,
+    city: parsed.city,
+    maxPowerKw: parsed.maxPowerKw,
+    connectors: parsed.connectors || [],
+  };
+}
+
+/**
+ * Парсва попъпа от Fines: име на локация, адрес, град, maxPowerKw и списък с конектори по станции.
+ * Очакван формат: "Станция Hypercharger" следвано от редове "CCS конектор с максимална мощност 300kW и цена 0.39 EUR / kWh."
+ */
+function parsePopupTextWithStations(raw) {
+  const result = {
+    name: 'Fines Charging',
+    address: '',
+    city: '',
+    maxPowerKw: null,
+    connectors: [],
+  };
+  if (!raw || typeof raw !== 'string') return result;
+
   const lines = raw
     .trim()
     .split(/\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  let name = 'Fines Charging';
-  let address = '';
-  let city = '';
-  let maxPowerKw = null;
+
   const addrLabels = /^(адрес|address|ул\.|бул\.|булевард|улица|гр\.|град|city|town)/i;
-  const powerMatch = raw.match(/(\d+)\s*(?:kW|кВт)/i) || raw.match(/мощност[^\d]*(\d+)/i);
-  if (powerMatch) maxPowerKw = parseInt(powerMatch[1], 10);
-  if (lines.length >= 1) name = lines[0];
-  if (lines.length >= 2 && !addrLabels.test(lines[1])) address = lines[1];
-  for (let i = 1; i < lines.length; i++) {
-    if (addrLabels.test(lines[i])) {
-      const rest = lines[i].replace(addrLabels, '').replace(/^[:\s]+/, '').trim();
-      if (/^(адрес|address)/i.test(lines[i])) address = rest || lines[i + 1] || address;
-      if (/^(град|city|town|гр\.)/i.test(lines[i])) city = rest || lines[i + 1] || city;
-    } else if (!address && lines[i].length > 3) address = lines[i];
+  const stationHeading = /^Станция\s+(.+)$/i;
+  const connectorLine = /^(.+?)\s+конектор\s+с\s+максимална\s+мощност\s+(\d+)\s*kW?\s*(?:и\s+цена\s+([^.]+))?/i;
+
+  let currentStationName = null;
+  let maxPowerKw = null;
+
+  if (lines.length >= 1) {
+    const firstLine = lines[0].replace(/\s*·\s*\d+\s*kW\s*$/i, '').trim();
+    result.name = firstLine || result.name;
   }
-  return { name, address, city, maxPowerKw };
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    const stationMatch = line.match(stationHeading);
+    if (stationMatch) {
+      currentStationName = stationMatch[1].trim();
+      continue;
+    }
+    const connMatch = line.match(connectorLine);
+    if (connMatch) {
+      const type = connMatch[1].trim();
+      const powerKw = parseInt(connMatch[2], 10);
+      const usageCost = (connMatch[3] || '').trim() || undefined;
+      if (!Number.isNaN(powerKw)) {
+        if (maxPowerKw == null || powerKw > maxPowerKw) maxPowerKw = powerKw;
+        result.connectors.push({
+          type: type || 'CCS',
+          powerKw,
+          usageCost: usageCost || '0.39 EUR / kWh',
+          stationName: currentStationName || undefined,
+        });
+      }
+      continue;
+    }
+    if (addrLabels.test(line)) {
+      const rest = line.replace(addrLabels, '').replace(/^[:\s]+/, '').trim();
+      if (/^(адрес|address)/i.test(line)) result.address = rest || lines[i + 1] || result.address;
+      if (/^(град|city|town|гр\.)/i.test(line)) result.city = rest || lines[i + 1] || result.city;
+    } else if (!result.address && line.length > 3 && !line.startsWith('На локацията') && !/^Как да стигна/i.test(line)) {
+      result.address = line;
+    }
+  }
+
+  const powerMatch = raw.match(/(\d+)\s*(?:kW|кВт)/i) || raw.match(/мощност[^\d]*(\d+)/i);
+  if (powerMatch) result.maxPowerKw = parseInt(powerMatch[1], 10);
+  if (maxPowerKw != null) result.maxPowerKw = result.maxPowerKw != null ? Math.max(result.maxPowerKw, maxPowerKw) : maxPowerKw;
+
+  return result;
 }
 
 function normalizeLocations(raw) {
@@ -447,7 +504,7 @@ async function main() {
             await page.evaluate((idx) => {
               if (window.__finesMarkerLayers && window.__finesMarkerLayers[idx]) window.__finesMarkerLayers[idx].closePopup();
             }, i);
-            const { name, address, city, maxPowerKw } = parsePopupText(text);
+            const { name, address, city, maxPowerKw, connectors } = parsePopupText(text);
             enriched.push({
               latitude: positions[i].lat,
               longitude: positions[i].lng,
@@ -456,6 +513,7 @@ async function main() {
               city: city || '',
               country: 'BG',
               maxPowerKw: maxPowerKw != null ? maxPowerKw : null,
+              connectors: Array.isArray(connectors) && connectors.length > 0 ? connectors : undefined,
             });
           } catch (_) {}
           await page.waitForTimeout(CLICK_BETWEEN_MARKERS_MS);

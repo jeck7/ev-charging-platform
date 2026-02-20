@@ -448,23 +448,44 @@ public class OpenChargeMapService {
         return connectors;
     }
 
-    /** Serialize connectors to JSON for DB storage (type, powerKw, usageCost when present). */
+    /** Serialize connectors to JSON for DB storage (type, powerKw, usageCost, stationName when present). */
     private String connectorsToJson(JsonNode stationNode) {
         List<Map<String, Object>> list = new ArrayList<>();
-        if (stationNode.has("Connections") && stationNode.get("Connections").isArray()) {
-            for (JsonNode connNode : stationNode.get("Connections")) {
-                String type = connNode.has("ConnectionType") && connNode.get("ConnectionType").has("Title")
-                        ? connNode.get("ConnectionType").get("Title").asText() : "Unknown";
-                double powerKw = connNode.has("PowerKW") ? connNode.get("PowerKW").asDouble() : 0;
-                String usageCost = connNode.has("UsageCost") && !connNode.get("UsageCost").isNull()
-                        ? connNode.get("UsageCost").asText().trim() : null;
-                Map<String, Object> map = new java.util.HashMap<>(Map.of("type", type, "powerKw", powerKw));
-                if (usageCost != null && !usageCost.isEmpty()) {
-                    map.put("usageCost", usageCost);
+        boolean hasEquipmentConnectors = false;
+        
+        // Group connectors by Equipment if available
+        if (stationNode.has("Equipment")) {
+            JsonNode equipmentNode = stationNode.get("Equipment");
+            if (equipmentNode.isArray()) {
+                // If Equipment is an array, iterate through each equipment
+                for (JsonNode eq : equipmentNode) {
+                    String equipmentName = eq.has("Title") ? eq.get("Title").asText() : null;
+                    if (eq.has("Connections") && eq.get("Connections").isArray()) {
+                        for (JsonNode connNode : eq.get("Connections")) {
+                            addConnectorToList(list, connNode, equipmentName);
+                            hasEquipmentConnectors = true;
+                        }
+                    }
                 }
-                list.add(map);
+            } else if (equipmentNode.isObject()) {
+                // If Equipment is a single object (not array)
+                String equipmentName = equipmentNode.has("Title") ? equipmentNode.get("Title").asText() : null;
+                if (equipmentNode.has("Connections") && equipmentNode.get("Connections").isArray()) {
+                    for (JsonNode connNode : equipmentNode.get("Connections")) {
+                        addConnectorToList(list, connNode, equipmentName);
+                        hasEquipmentConnectors = true;
+                    }
+                }
             }
         }
+        
+        // Fallback: if no Equipment or Equipment had no Connections, use Connections directly from station
+        if (!hasEquipmentConnectors && stationNode.has("Connections") && stationNode.get("Connections").isArray()) {
+            for (JsonNode connNode : stationNode.get("Connections")) {
+                addConnectorToList(list, connNode, null);
+            }
+        }
+        
         if (list.isEmpty()) return null;
         try {
             return objectMapper.writeValueAsString(list);
@@ -472,6 +493,23 @@ public class OpenChargeMapService {
             log.warn("Failed to serialize connectors to JSON", e);
             return null;
         }
+    }
+    
+    /** Helper method to add a connector to the list with optional station name. */
+    private void addConnectorToList(List<Map<String, Object>> list, JsonNode connNode, String stationName) {
+        String type = connNode.has("ConnectionType") && connNode.get("ConnectionType").has("Title")
+                ? connNode.get("ConnectionType").get("Title").asText() : "Unknown";
+        double powerKw = connNode.has("PowerKW") ? connNode.get("PowerKW").asDouble() : 0;
+        String usageCost = connNode.has("UsageCost") && !connNode.get("UsageCost").isNull()
+                ? connNode.get("UsageCost").asText().trim() : null;
+        Map<String, Object> map = new java.util.HashMap<>(Map.of("type", type, "powerKw", powerKw));
+        if (usageCost != null && !usageCost.isEmpty()) {
+            map.put("usageCost", usageCost);
+        }
+        if (stationName != null && !stationName.isEmpty()) {
+            map.put("stationName", stationName);
+        }
+        list.add(map);
     }
 
     /**

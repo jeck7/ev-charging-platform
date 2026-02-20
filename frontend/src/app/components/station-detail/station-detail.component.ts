@@ -6,9 +6,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { StationService } from '../../services/station.service';
-import { ChargingStation } from '../../models/charging-station.model';
+import { ChargingStation, ConnectorInfo } from '../../models/charging-station.model';
 import { ConnectorIconComponent } from '../connector-icon/connector-icon.component';
 import * as L from 'leaflet';
+
+interface ConnectorGroup {
+  stationName: string | null;
+  connectors: ConnectorInfo[];
+}
 
 @Component({
   selector: 'app-station-detail',
@@ -31,6 +36,7 @@ export class StationDetailComponent implements OnInit, AfterViewInit {
   error: string | null = null;
   private map: L.Map | null = null;
   private marker: L.Marker | null = null;
+  private mapInitRetryCount = 0;
   readonly mapId = 'station-detail-map-' + Math.random().toString(36).slice(2);
 
   constructor(
@@ -44,8 +50,8 @@ export class StationDetailComponent implements OnInit, AfterViewInit {
       next: (data) => {
         this.station = data;
         this.loading = false;
-        // Initialize map after station is loaded
-        setTimeout(() => this.initMap(), 100);
+        // Initialize map after view has rendered the map container
+        setTimeout(() => this.initMap(), 0);
       },
       error: () => {
         this.error = 'Station not found';
@@ -61,7 +67,17 @@ export class StationDetailComponent implements OnInit, AfterViewInit {
   private initMap(): void {
     if (typeof window === 'undefined' || !this.station) return;
     if (this.station.latitude == null || this.station.longitude == null) return;
-    
+
+    const container = document.getElementById(this.mapId);
+    if (!container) {
+      if (this.mapInitRetryCount < 2) {
+        this.mapInitRetryCount++;
+        setTimeout(() => this.initMap(), 150);
+      }
+      return;
+    }
+    this.mapInitRetryCount = 0;
+
     // Remove existing map if any
     if (this.map) {
       this.map.remove();
@@ -104,5 +120,41 @@ export class StationDetailComponent implements OnInit, AfterViewInit {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  /**
+   * Групира конекторите по станции (stationName).
+   * Конекторите без stationName се групират под "null".
+   */
+  getConnectorGroups(): ConnectorGroup[] {
+    if (!this.station || !this.station.connectors || this.station.connectors.length === 0) {
+      return [];
+    }
+
+    const groups = new Map<string | null, ConnectorInfo[]>();
+    
+    for (const connector of this.station.connectors) {
+      const stationName = connector.stationName || null;
+      if (!groups.has(stationName)) {
+        groups.set(stationName, []);
+      }
+      groups.get(stationName)!.push(connector);
+    }
+
+    // Конвертираме Map в масив и сортираме: първо станциите с име, после без име
+    const result: ConnectorGroup[] = [];
+    for (const [stationName, connectors] of groups.entries()) {
+      result.push({ stationName, connectors });
+    }
+    
+    // Сортираме: станции с име първо (по азбучен ред), после без име
+    result.sort((a, b) => {
+      if (a.stationName === null && b.stationName === null) return 0;
+      if (a.stationName === null) return 1;
+      if (b.stationName === null) return -1;
+      return a.stationName.localeCompare(b.stationName);
+    });
+
+    return result;
   }
 }

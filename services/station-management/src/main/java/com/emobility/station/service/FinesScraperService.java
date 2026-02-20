@@ -167,14 +167,7 @@ public class FinesScraperService {
         BigDecimal maxPowerKw = toBigDecimal(m.get("maxPowerKw"));
         if (maxPowerKw == null) maxPowerKw = BigDecimal.valueOf(120);
         String externalId = "fines-scrape-" + latitude.stripTrailingZeros().toPlainString() + "-" + longitude.stripTrailingZeros().toPlainString();
-        String connectorsJson = null;
-        if (maxPowerKw != null) {
-            try {
-                connectorsJson = objectMapper.writeValueAsString(List.of(
-                        Map.of("type", "CCS", "powerKw", maxPowerKw.doubleValue(), "usageCost", "0.39 EUR / kWh")
-                ));
-            } catch (Exception ignored) {}
-        }
+        String connectorsJson = parseConnectorsFromScraped(m, maxPowerKw);
         return ChargingStation.builder()
                 .name(name)
                 .address(address.isEmpty() ? name : address)
@@ -188,6 +181,45 @@ public class FinesScraperService {
                 .status(ChargingStation.StationStatus.ACTIVE)
                 .externalId(externalId)
                 .build();
+    }
+
+    /**
+     * Извлича connectorsJson от скрейпнатия обект: ако има масив "connectors" с обекти { type, powerKw, usageCost?, stationName? }, сериализира го;
+     * иначе при наличие на maxPowerKw връща един CCS конектор.
+     */
+    @SuppressWarnings("unchecked")
+    private String parseConnectorsFromScraped(Map<String, Object> m, BigDecimal maxPowerKw) {
+        Object connList = m.get("connectors");
+        if (connList instanceof List && !((List<?>) connList).isEmpty()) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Object item : (List<?>) connList) {
+                if (!(item instanceof Map)) continue;
+                Map<String, Object> conn = (Map<String, Object>) item;
+                Object type = conn.get("type");
+                Object powerKw = conn.get("powerKw");
+                if (type == null || powerKw == null) continue;
+                double kw = powerKw instanceof Number ? ((Number) powerKw).doubleValue() : Double.parseDouble(powerKw.toString());
+                Map<String, Object> entry = new java.util.HashMap<>(Map.of("type", type.toString(), "powerKw", kw));
+                Object usageCost = conn.get("usageCost");
+                if (usageCost != null && !usageCost.toString().isBlank()) entry.put("usageCost", usageCost.toString());
+                Object stationName = conn.get("stationName");
+                if (stationName != null && !stationName.toString().isBlank()) entry.put("stationName", stationName.toString());
+                out.add(entry);
+            }
+            if (!out.isEmpty()) {
+                try {
+                    return objectMapper.writeValueAsString(out);
+                } catch (Exception ignored) {}
+            }
+        }
+        if (maxPowerKw != null) {
+            try {
+                return objectMapper.writeValueAsString(List.of(
+                        Map.of("type", "CCS", "powerKw", maxPowerKw.doubleValue(), "usageCost", "0.39 EUR / kWh")
+                ));
+            } catch (Exception ignored) {}
+        }
+        return null;
     }
 
     private static BigDecimal toBigDecimal(Object o) {

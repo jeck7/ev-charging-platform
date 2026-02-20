@@ -2,6 +2,7 @@ export interface ConnectorInfo {
   type: string;
   powerKw: number;
   usageCost?: string;
+  stationName?: string; // e.g. "Hypercharger" - name of the specific charging station/equipment
 }
 
 export interface ChargingStation {

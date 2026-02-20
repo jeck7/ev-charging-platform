@@ -13,4 +13,5 @@ public class ConnectorInfo {
     private String type;      // e.g. "CCS", "Type 2"
     private Double powerKw;
     private String usageCost;  // e.g. "0.39 EUR / kWh" when provided by Open Charge Map
+    private String stationName; // e.g. "Hypercharger" - name of the specific charging station/equipment
 }

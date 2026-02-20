@@ -1,50 +1,45 @@
 {
+  "/api/auth": {
+    "target": "https://localhost:8082",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug",
+    "headers": { "Host": "localhost:8082" }
+  },
   "/api/stations": {
     "target": "https://localhost:8082",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug",
-    "headers": {
-      "Host": "localhost:8082"
-    }
+    "headers": { "Host": "localhost:8082" }
   },
   "/api/sessions": {
     "target": "https://localhost:8081",
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug",
-    "headers": {
-      "Host": "localhost:8081"
-    }
+    "headers": { "Host": "localhost:8081" }
   },
   "/api/nominatim": {
     "target": "https://nominatim.openstreetmap.org",
     "secure": true,
     "changeOrigin": true,
     "logLevel": "debug",
-    "pathRewrite": {
-      "^/api/nominatim": ""
-    },
-    "headers": {
-      "User-Agent": "eMobility-EV-Charging/1.0"
-    }
+    "pathRewrite": { "^/api/nominatim": "" },
+    "headers": { "User-Agent": "eMobility-EV-Charging/1.0" }
   },
   "/api/osrm": {
     "target": "https://router.project-osrm.org",
     "secure": true,
     "changeOrigin": true,
     "logLevel": "debug",
-    "pathRewrite": {
-      "^/api/osrm": ""
-    }
+    "pathRewrite": { "^/api/osrm": "" }
   },
   "/api/ors": {
     "target": "https://api.openrouteservice.org",
     "secure": true,
     "changeOrigin": true,
     "logLevel": "debug",
-    "pathRewrite": {
-      "^/api/ors": ""
-    }
+    "pathRewrite": { "^/api/ors": "" }
   }
 }
