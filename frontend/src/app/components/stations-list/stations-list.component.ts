@@ -15,6 +15,7 @@ import { StationImportService } from '../../services/station-import.service';
 import { ChargingStation } from '../../models/charging-station.model';
 import type { RoutePoint } from '../../data/highway-routes';
 import { StationsMapComponent } from '../stations-map/stations-map.component';
+import { ConnectorIconComponent } from '../connector-icon/connector-icon.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 type ViewMode = 'split' | 'map';
@@ -35,6 +36,7 @@ type ViewMode = 'split' | 'map';
     MatInputModule,
     MatTooltipModule,
     StationsMapComponent,
+    ConnectorIconComponent,
   ],
   templateUrl: './stations-list.component.html',
   styleUrl: './stations-list.component.css',
@@ -54,6 +56,7 @@ export class StationsListComponent implements OnInit, OnDestroy {
 
   filterSearch: string = '';
   filterMinPower: number | null = null;
+  filterConnectorType: 'ccs' | 'type2' | 'chademo' | null = null;
 
   /** Пътувам от / до и заредено трасе за картата */
   customRouteFrom = '';
@@ -270,12 +273,29 @@ export class StationsListComponent implements OnInit, OnDestroy {
     return `${distanceKm.toFixed(1)} km`;
   }
 
+  /** Нормализира тип конектор до 'ccs', 'type2', 'chademo' или null */
+  private normalizeConnectorType(type: string): 'ccs' | 'type2' | 'chademo' | null {
+    const t = (type || '').toLowerCase();
+    if (t.includes('ccs') || t.includes('combo')) return 'ccs';
+    if (t.includes('type 2') || t.includes('type2') || t.includes('mennekes')) return 'type2';
+    if (t.includes('chademo')) return 'chademo';
+    return null;
+  }
+
   applyFilters(): void {
     let result = [...this.stations];
     if (this.filterMinPower != null && this.filterMinPower > 0) {
       result = result.filter(
         (s) => (s.maxPowerKw ?? 0) >= this.filterMinPower!
       );
+    }
+    if (this.filterConnectorType) {
+      result = result.filter((s) => {
+        if (!s.connectors || s.connectors.length === 0) return false;
+        return s.connectors.some(
+          (conn) => this.normalizeConnectorType(conn.type) === this.filterConnectorType
+        );
+      });
     }
     if (this.filterSearch.trim()) {
       const q = this.filterSearch.trim().toLowerCase();
@@ -323,6 +343,14 @@ export class StationsListComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
+  /** Изчисти полето за търсене и ресетни изгледа на картата */
+  clearSearch(): void {
+    this.filterSearch = '';
+    this.selectedStationId = null;
+    // Не ресетваме filterConnectorType и filterMinPower - потребителят може да иска да ги запази
+    this.applyFilters();
+  }
+
   /** Изчисти маршрута от—до и покажи всички станции */
   clearCustomRoute(): void {
     this.customRoute = null;
@@ -332,15 +360,45 @@ export class StationsListComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
-  /** Геокодиране чрез Nominatim (OSM) */
+  /** Геокодиране чрез Nominatim (OSM) - приоритизира България */
   private geocode(query: string): Promise<{ lat: number; lng: number }> {
-    const url = `/api/nominatim/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+    // Първо опитваме с ограничение до България
+    const queryWithCountry = query.toLowerCase().includes('българия') || query.toLowerCase().includes('bulgaria')
+      ? query
+      : `${query}, България`;
+    const url = `/api/nominatim/search?q=${encodeURIComponent(queryWithCountry)}&format=json&limit=5&countrycodes=bg`;
     return fetch(url, {
       headers: { Accept: 'application/json', 'User-Agent': 'eMobility-EV-Charging/1.0' },
     })
       .then((r) => r.json())
-      .then((arr: { lat: string; lon: string }[]) => {
-        if (!Array.isArray(arr) || arr.length === 0) throw new Error(`Не е намерено: ${query}`);
+      .then((arr: { lat: string; lon: string; display_name?: string; address?: { country_code?: string } }[]) => {
+        if (!Array.isArray(arr) || arr.length === 0) {
+          // Fallback: опитваме без ограничение до България, но филтрираме резултатите
+          const fallbackUrl = `/api/nominatim/search?q=${encodeURIComponent(query)}&format=json&limit=10`;
+          return fetch(fallbackUrl, {
+            headers: { Accept: 'application/json', 'User-Agent': 'eMobility-EV-Charging/1.0' },
+          })
+            .then((r) => r.json())
+            .then((fallbackArr: { lat: string; lon: string; display_name?: string; address?: { country_code?: string } }[]) => {
+              if (!Array.isArray(fallbackArr) || fallbackArr.length === 0) {
+                throw new Error(`Не е намерено: ${query}`);
+              }
+              // Търсим резултат от България
+              const bgResult = fallbackArr.find(
+                (item) =>
+                  item.address?.country_code === 'bg' ||
+                  item.display_name?.toLowerCase().includes('bulgaria') ||
+                  item.display_name?.toLowerCase().includes('българия')
+              );
+              if (bgResult) {
+                return { lat: parseFloat(bgResult.lat), lng: parseFloat(bgResult.lon) };
+              }
+              // Ако няма от България, връщаме първия резултат
+              const c = fallbackArr[0];
+              return { lat: parseFloat(c.lat), lng: parseFloat(c.lon) };
+            });
+        }
+        // Връщаме първия резултат (който е от България заради countrycodes=bg)
         const c = arr[0];
         return { lat: parseFloat(c.lat), lng: parseFloat(c.lon) };
       });

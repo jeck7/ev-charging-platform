@@ -251,6 +251,48 @@
   padding: 0.4rem 0.75rem;
 }
 
+.connector-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.25rem;
+}
+
+.connector-label {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+.connector-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.connector-toggle .view-btn {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.connector-btn {
+  flex-direction: row;
+}
+
+.connector-btn app-connector-icon {
+  flex-shrink: 0;
+}
+
+.connector-btn span {
+  font-size: 0.8125rem;
+}
+
 .filter-field-compact {
   width: auto;
   min-width: 0;

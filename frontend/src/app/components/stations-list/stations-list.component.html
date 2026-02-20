@@ -57,6 +57,11 @@
             <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-search">
               <mat-label>Търсене</mat-label>
               <input matInput [(ngModel)]="filterSearch" (ngModelChange)="onFilterChange()" placeholder="Име, адрес, град..." />
+              @if (filterSearch) {
+                <button mat-icon-button matSuffix type="button" (click)="clearSearch()" matTooltip="Изчисти търсене">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
             </mat-form-field>
             <div class="min-kw-filter">
               <span class="min-kw-label">Мин. kW</span>
@@ -66,6 +71,24 @@
                 <button type="button" class="view-btn" [class.active]="filterMinPower === 50" (click)="filterMinPower = 50; onFilterChange()">≥ 50</button>
                 <button type="button" class="view-btn" [class.active]="filterMinPower === 100" (click)="filterMinPower = 100; onFilterChange()">≥ 100</button>
                 <button type="button" class="view-btn" [class.active]="filterMinPower === 150" (click)="filterMinPower = 150; onFilterChange()">≥ 150</button>
+              </div>
+            </div>
+            <div class="connector-filter">
+              <span class="connector-label">Конектор</span>
+              <div class="view-toggle connector-toggle">
+                <button type="button" class="view-btn" [class.active]="filterConnectorType === null" (click)="filterConnectorType = null; onFilterChange()">Всички</button>
+                <button type="button" class="view-btn connector-btn" [class.active]="filterConnectorType === 'ccs'" (click)="filterConnectorType = 'ccs'; onFilterChange()">
+                  <app-connector-icon type="CCS" />
+                  <span>CCS</span>
+                </button>
+                <button type="button" class="view-btn connector-btn" [class.active]="filterConnectorType === 'type2'" (click)="filterConnectorType = 'type2'; onFilterChange()">
+                  <app-connector-icon type="Type 2" />
+                  <span>Type 2</span>
+                </button>
+                <button type="button" class="view-btn connector-btn" [class.active]="filterConnectorType === 'chademo'" (click)="filterConnectorType = 'chademo'; onFilterChange()">
+                  <app-connector-icon type="CHAdeMO" />
+                  <span>CHAdeMO</span>
+                </button>
               </div>
             </div>
             <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-route">
