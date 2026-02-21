@@ -51,10 +51,10 @@
     }
     <mat-card class="search-card">
       <mat-card-content>
-        <h1 class="search-card-title">Търсене на Зарядни станции</h1>
-        <div class="toolbar toolbar-compact toolbar-single-row">
-          <div class="filters filters-compact filters-single-row">
-            <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-search">
+          <h1 class="search-card-title">Търсене на Зарядни станции</h1>
+          <div class="toolbar toolbar-compact toolbar-single-row">
+            <div class="filters filters-compact filters-single-row">
+              <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-search">
               <mat-label>Търсене</mat-label>
               <input matInput [(ngModel)]="filterSearch" (ngModelChange)="onFilterChange()" placeholder="Име, адрес, град..." />
               @if (filterSearch) {
@@ -116,9 +116,10 @@
               <span class="custom-route-error-inline">{{ customRouteError }}</span>
             }
           </div>
-          <div class="search-card-view-toggle view-toggle">
-            <button type="button" class="view-btn" [class.active]="viewMode === 'split'" (click)="viewMode = 'split'">Карта + списък</button>
-            <button type="button" class="view-btn" [class.active]="viewMode === 'map'" (click)="viewMode = 'map'">Карта</button>
+          <div class="search-card-view-toggle">
+            <button type="button" class="view-btn view-toggle-single" (click)="toggleViewMode()">
+              {{ viewMode === 'split' ? 'Само карта' : 'Карта + списък' }}
+            </button>
           </div>
         </div>
       </mat-card-content>
@@ -131,7 +132,7 @@
       @if (locationLoading && !customRouteLoading) {
         <span class="location-status"><mat-icon class="spin">my_location</mat-icon> Определяне на вашата локация...</span>
       } @else if (userLocation && !customRouteLoading) {
-        <span class="location-status location-ok"><mat-icon>my_location</mat-icon> Сортирани по близост до вас</span>
+        <span class="location-status location-ok"><mat-icon>my_location</mat-icon> Станции сортирани по близост до вас</span>
       } @else if (locationError) {
         <span class="location-status location-warn">{{ locationError }}</span>
       }

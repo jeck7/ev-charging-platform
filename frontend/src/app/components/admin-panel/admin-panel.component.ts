@@ -10,6 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { StationImportService, ImportJobStatus, StationStats } from '../../services/station-import.service';
+import { StationCountryService } from '../../services/station-country.service';
 import { interval, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
@@ -31,6 +32,7 @@ import { switchMap } from 'rxjs/operators';
   styleUrl: './admin-panel.component.css',
 })
 export class AdminPanelComponent implements OnInit, OnDestroy {
+  /** Държава за импорт и за показване на станции в публичния списък */
   selectedCountry = 'BG';
   isImporting = false;
   isFinesScraping = false;
@@ -53,10 +55,12 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
 
   constructor(
     private importService: StationImportService,
+    private stationCountry: StationCountryService,
     private snackBar: MatSnackBar
   ) {}
 
   ngOnInit() {
+    this.selectedCountry = this.stationCountry.getCountry();
     this.loadStats();
     this.importService.getEnrichPricesStatus().subscribe({
       next: (s) => (this.enrichStatus = s),
@@ -71,6 +75,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   }
 
   loadStats() {
+    this.stationCountry.setCountry(this.selectedCountry);
     this.importService.getStationStats(this.selectedCountry).subscribe({
       next: (stats) => {
         this.stats = stats;

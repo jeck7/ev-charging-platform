@@ -41,7 +41,8 @@ public class ChargingStationController {
     @GetMapping
     public List<ChargingStationResponse> getAllStations(
             @RequestParam(required = false) String city,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String country) {
         List<ChargingStation> stations;
         if (city != null) {
             stations = stationRepository.findByCity(city);
@@ -50,6 +51,22 @@ public class ChargingStationController {
                 stations = stationRepository.findByStatus(ChargingStation.StationStatus.valueOf(status));
             } catch (IllegalArgumentException e) {
                 stations = stationRepository.findAll();
+            }
+        } else if (country != null) {
+            // Търси по country code (BG) или име (Bulgaria), case-insensitive
+            // Ако е подаден "BG", търси и "BG" и "Bulgaria"
+            String countryUpper = country.toUpperCase();
+            if ("BG".equals(countryUpper) || "BULGARIA".equals(countryUpper)) {
+                stations = stationRepository.findAll().stream()
+                    .filter(s -> {
+                        String sCountry = s.getCountry();
+                        if (sCountry == null) return false;
+                        String sCountryUpper = sCountry.toUpperCase();
+                        return "BG".equals(sCountryUpper) || "BULGARIA".equals(sCountryUpper) || sCountryUpper.contains("BULGARIA");
+                    })
+                    .collect(Collectors.toList());
+            } else {
+                stations = stationRepository.findByCountryIgnoreCase(country);
             }
         } else {
             stations = stationRepository.findAll();

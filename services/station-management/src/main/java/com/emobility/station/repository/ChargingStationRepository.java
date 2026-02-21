@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface ChargingStationRepository extends JpaRepository<ChargingStation, Long> {
     List<ChargingStation> findByCity(String city);
     List<ChargingStation> findByStatus(ChargingStation.StationStatus status);
+    List<ChargingStation> findByCountryIgnoreCase(String country);
     boolean existsByExternalId(String externalId);
     ChargingStation findByExternalId(String externalId);
 

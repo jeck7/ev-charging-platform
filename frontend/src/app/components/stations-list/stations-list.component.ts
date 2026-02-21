@@ -12,6 +12,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { StationService } from '../../services/station.service';
 import { StationImportService } from '../../services/station-import.service';
+import { StationCountryService } from '../../services/station-country.service';
 import { ChargingStation } from '../../models/charging-station.model';
 import type { RoutePoint } from '../../data/highway-routes';
 import { StationsMapComponent } from '../stations-map/stations-map.component';
@@ -80,6 +81,7 @@ export class StationsListComponent implements OnInit, OnDestroy {
   constructor(
     private stationService: StationService,
     private importService: StationImportService,
+    private stationCountry: StationCountryService,
     private snackBar: MatSnackBar
   ) {}
 
@@ -116,17 +118,12 @@ export class StationsListComponent implements OnInit, OnDestroy {
   loadStations(): void {
     this.loading = true;
     this.error = null;
-    this.stationService.getStations().subscribe({
+    // Зареждаме станции от държавата, избрана в Админ панела
+    this.stationService.getStations(undefined, undefined, this.stationCountry.getCountry()).subscribe({
       next: (data) => {
         this.stations = data;
-        // Покажи подсказка за импорт ако има малко станции (особено в България)
-        const bgStations = data.filter(
-          (s) =>
-            (s.country && s.country.toUpperCase() === 'BG') ||
-            (s.country && s.country.toLowerCase().includes('bulgaria'))
-        );
-        // Покажи подсказка ако има по-малко от 20 станции общо или по-малко от 10 в България
-        this.showImportPrompt = data.length < 20 || bgStations.length < 10;
+        // Покажи подсказка за импорт ако има малко станции
+        this.showImportPrompt = data.length < 10;
         this.applyFilters();
         this.loading = false;
       },
@@ -442,6 +439,10 @@ export class StationsListComponent implements OnInit, OnDestroy {
 
   setViewMode(mode: ViewMode): void {
     this.viewMode = mode;
+  }
+
+  toggleViewMode(): void {
+    this.viewMode = this.viewMode === 'split' ? 'map' : 'split';
   }
 
   onSelectStation(station: ChargingStation, event?: Event): void {

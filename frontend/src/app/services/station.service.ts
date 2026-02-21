@@ -13,10 +13,11 @@ export class StationService {
 
   constructor(private http: HttpClient) {}
 
-  getStations(city?: string, status?: string): Observable<ChargingStation[]> {
+  getStations(city?: string, status?: string, country?: string): Observable<ChargingStation[]> {
     let params = new HttpParams();
     if (city) params = params.set('city', city);
     if (status) params = params.set('status', status);
+    if (country) params = params.set('country', country);
     return this.http
       .get<ChargingStation[]>(this.apiUrl, { params })
       .pipe(map((list) => (list || []).map((s) => this.normalizeStation(s))));
