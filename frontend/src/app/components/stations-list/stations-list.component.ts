@@ -13,6 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { StationService } from '../../services/station.service';
 import { StationImportService } from '../../services/station-import.service';
 import { StationCountryService } from '../../services/station-country.service';
+import { RouteSearchStateService } from '../../services/route-search-state.service';
 import { ChargingStation } from '../../models/charging-station.model';
 import type { RoutePoint } from '../../data/highway-routes';
 import { StationsMapComponent } from '../stations-map/stations-map.component';
@@ -56,8 +57,10 @@ export class StationsListComponent implements OnInit, OnDestroy {
   locationError: string | null = null;
 
   filterSearch: string = '';
-  filterMinPower: number | null = null;
-  filterConnectorType: 'ccs' | 'type2' | 'chademo' | null = null;
+  /** Избрани минимални мощности (kW) за филтър – показваме станции с мощност >= най-ниската избрана (празно = без филтър). */
+  filterMinPowers: number[] = [];
+  /** Избрани типове конектор за филтър (празно = без филтър по конектор). */
+  filterConnectorTypes: ('ccs' | 'type2' | 'chademo')[] = [];
 
   /** Пътувам от / до и заредено трасе за картата */
   customRouteFrom = '';
@@ -78,16 +81,38 @@ export class StationsListComponent implements OnInit, OnDestroy {
   isImporting = false;
   private importPollInterval: any = null;
 
+  /** Кратко име на текущата държава за показ в обобщението. */
+  get countryLabel(): string {
+    const code = this.stationCountry.getCountry()?.toUpperCase() || '';
+    const labels: Record<string, string> = { BG: 'БГ', RO: 'Румъния', GR: 'Гърция', TR: 'Турция', DE: 'Германия' };
+    return labels[code] || code || 'БГ';
+  }
+
   constructor(
     private stationService: StationService,
     private importService: StationImportService,
     private stationCountry: StationCountryService,
+    private routeSearchState: RouteSearchStateService,
     private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
+    this.restoreRouteState();
     this.requestUserLocation();
     this.loadStations();
+  }
+
+  /** Възстановява запазения маршрут при връщане от детайли. */
+  private restoreRouteState(): void {
+    if (!this.routeSearchState.hasSavedRoute()) return;
+    this.customRouteFrom = this.routeSearchState.getRouteFrom();
+    this.customRouteTo = this.routeSearchState.getRouteTo();
+    const saved = this.routeSearchState.getRoute();
+    if (saved && saved.length > 0) {
+      this.customRoute = saved;
+    }
+    const err = this.routeSearchState.getRouteError();
+    if (err) this.customRouteError = err;
   }
 
   requestUserLocation(): void {
@@ -281,17 +306,17 @@ export class StationsListComponent implements OnInit, OnDestroy {
 
   applyFilters(): void {
     let result = [...this.stations];
-    if (this.filterMinPower != null && this.filterMinPower > 0) {
-      result = result.filter(
-        (s) => (s.maxPowerKw ?? 0) >= this.filterMinPower!
-      );
+    if (this.filterMinPowers.length > 0) {
+      const minKw = Math.min(...this.filterMinPowers);
+      result = result.filter((s) => (s.maxPowerKw ?? 0) >= minKw);
     }
-    if (this.filterConnectorType) {
+    if (this.filterConnectorTypes.length > 0) {
       result = result.filter((s) => {
         if (!s.connectors || s.connectors.length === 0) return false;
-        return s.connectors.some(
-          (conn) => this.normalizeConnectorType(conn.type) === this.filterConnectorType
-        );
+        return s.connectors.some((conn) => {
+          const n = this.normalizeConnectorType(conn.type);
+          return n != null && this.filterConnectorTypes.includes(n);
+        });
       });
     }
     if (this.filterSearch.trim()) {
@@ -340,11 +365,41 @@ export class StationsListComponent implements OnInit, OnDestroy {
     this.applyFilters();
   }
 
+  /** Превключва избора на тип конектор за филтъра (включи/изключи). */
+  toggleConnectorType(type: 'ccs' | 'type2' | 'chademo'): void {
+    const i = this.filterConnectorTypes.indexOf(type);
+    if (i >= 0) {
+      this.filterConnectorTypes = this.filterConnectorTypes.filter((t) => t !== type);
+    } else {
+      this.filterConnectorTypes = [...this.filterConnectorTypes, type];
+    }
+    this.applyFilters();
+  }
+
+  isConnectorTypeSelected(type: 'ccs' | 'type2' | 'chademo'): boolean {
+    return this.filterConnectorTypes.includes(type);
+  }
+
+  /** Превключва избора на минимална мощност (kW) за филтъра. */
+  toggleMinPower(kw: number): void {
+    const i = this.filterMinPowers.indexOf(kw);
+    if (i >= 0) {
+      this.filterMinPowers = this.filterMinPowers.filter((k) => k !== kw);
+    } else {
+      this.filterMinPowers = [...this.filterMinPowers, kw];
+    }
+    this.applyFilters();
+  }
+
+  isMinPowerSelected(kw: number): boolean {
+    return this.filterMinPowers.includes(kw);
+  }
+
   /** Изчисти полето за търсене и ресетни изгледа на картата */
   clearSearch(): void {
     this.filterSearch = '';
     this.selectedStationId = null;
-    // Не ресетваме filterConnectorType и filterMinPower - потребителят може да иска да ги запази
+    // Не ресетваме filterConnectorTypes и filterMinPowers – потребителят може да ги запази
     this.applyFilters();
   }
 
@@ -354,6 +409,7 @@ export class StationsListComponent implements OnInit, OnDestroy {
     this.customRouteError = null;
     this.customRouteFrom = '';
     this.customRouteTo = '';
+    this.routeSearchState.clear();
     this.applyFilters();
   }
 
@@ -424,12 +480,15 @@ export class StationsListComponent implements OnInit, OnDestroy {
               (c: number[]) => [c[1], c[0]] as RoutePoint
             );
             this.customRoute = coords;
+            this.customRouteError = null;
+            this.routeSearchState.saveState(from, to, coords, null);
             this.applyFilters();
           });
       })
       .catch((err) => {
         this.customRouteError = err?.message || 'Грешка при зареждане на маршрута';
         this.customRoute = null;
+        this.routeSearchState.saveState(from, to, null, this.customRouteError);
         this.applyFilters();
       })
       .finally(() => {

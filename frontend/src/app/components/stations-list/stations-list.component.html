@@ -49,57 +49,22 @@
         </mat-card-content>
       </mat-card>
     }
-    <mat-card class="search-card">
-      <mat-card-content>
-          <h1 class="search-card-title">Търсене на Зарядни станции</h1>
-          <div class="toolbar toolbar-compact toolbar-single-row">
-            <div class="filters filters-compact filters-single-row">
-              <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-search">
-              <mat-label>Търсене</mat-label>
-              <input matInput [(ngModel)]="filterSearch" (ngModelChange)="onFilterChange()" placeholder="Име, адрес, град..." />
-              @if (filterSearch) {
-                <button mat-icon-button matSuffix type="button" (click)="clearSearch()" matTooltip="Изчисти търсене">
-                  <mat-icon>close</mat-icon>
-                </button>
-              }
-            </mat-form-field>
-            <div class="min-kw-filter">
-              <span class="min-kw-label">Мин. kW</span>
-              <div class="view-toggle min-kw-toggle">
-                <button type="button" class="view-btn" [class.active]="filterMinPower === null" (click)="filterMinPower = null; onFilterChange()">—</button>
-                <button type="button" class="view-btn" [class.active]="filterMinPower === 22" (click)="filterMinPower = 22; onFilterChange()">≥ 22</button>
-                <button type="button" class="view-btn" [class.active]="filterMinPower === 50" (click)="filterMinPower = 50; onFilterChange()">≥ 50</button>
-                <button type="button" class="view-btn" [class.active]="filterMinPower === 100" (click)="filterMinPower = 100; onFilterChange()">≥ 100</button>
-                <button type="button" class="view-btn" [class.active]="filterMinPower === 150" (click)="filterMinPower = 150; onFilterChange()">≥ 150</button>
-              </div>
-            </div>
-            <div class="connector-filter">
-              <span class="connector-label">Конектор</span>
-              <div class="view-toggle connector-toggle">
-                <button type="button" class="view-btn" [class.active]="filterConnectorType === null" (click)="filterConnectorType = null; onFilterChange()">Всички</button>
-                <button type="button" class="view-btn connector-btn" [class.active]="filterConnectorType === 'ccs'" (click)="filterConnectorType = 'ccs'; onFilterChange()">
-                  <app-connector-icon type="CCS" />
-                  <span>CCS</span>
-                </button>
-                <button type="button" class="view-btn connector-btn" [class.active]="filterConnectorType === 'type2'" (click)="filterConnectorType = 'type2'; onFilterChange()">
-                  <app-connector-icon type="Type 2" />
-                  <span>Type 2</span>
-                </button>
-                <button type="button" class="view-btn connector-btn" [class.active]="filterConnectorType === 'chademo'" (click)="filterConnectorType = 'chademo'; onFilterChange()">
-                  <app-connector-icon type="CHAdeMO" />
-                  <span>CHAdeMO</span>
-                </button>
-              </div>
-            </div>
-            <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-route">
-              <mat-label>От</mat-label>
-              <input matInput [(ngModel)]="customRouteFrom" placeholder="напр. София" (keyup.enter)="loadCustomRoute()" />
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="filter-field filter-field-compact filter-field-route">
-              <mat-label>До</mat-label>
-              <input matInput [(ngModel)]="customRouteTo" placeholder="напр. Пловдив" (keyup.enter)="loadCustomRoute()" />
-            </mat-form-field>
-            <button mat-stroked-button color="primary" class="route-btn-compact" (click)="loadCustomRoute()" [disabled]="customRouteLoading">
+    <div class="page-layout">
+      <aside class="sidebar">
+        <h2 class="sidebar-title">Търсене на Зарядни станции</h2>
+
+        <section class="sidebar-section">
+          <h3 class="sidebar-section-title">Покажи само станции по маршрут</h3>
+          <mat-form-field appearance="outline" class="sidebar-field">
+            <mat-label>Пътувам от</mat-label>
+            <input matInput [(ngModel)]="customRouteFrom" placeholder="напр. София" (keyup.enter)="loadCustomRoute()" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="sidebar-field">
+            <mat-label>Пътувам до</mat-label>
+            <input matInput [(ngModel)]="customRouteTo" placeholder="напр. Пловдив" (keyup.enter)="loadCustomRoute()" />
+          </mat-form-field>
+          <div class="sidebar-actions">
+            <button mat-stroked-button color="primary" class="sidebar-btn" (click)="loadCustomRoute()" [disabled]="customRouteLoading">
               @if (customRouteLoading) {
                 <mat-icon class="spin">hourglass_empty</mat-icon>
               } @else {
@@ -108,23 +73,52 @@
               Маршрут
             </button>
             @if (customRoute) {
-              <button mat-icon-button type="button" class="clear-route-btn" (click)="clearCustomRoute()" matTooltip="Изчисти маршрут">
+              <button mat-icon-button type="button" (click)="clearCustomRoute()" matTooltip="Изчисти маршрут">
                 <mat-icon>close</mat-icon>
               </button>
             }
-            @if (customRouteError) {
-              <span class="custom-route-error-inline">{{ customRouteError }}</span>
-            }
           </div>
-          <div class="search-card-view-toggle">
-            <button type="button" class="view-btn view-toggle-single" (click)="toggleViewMode()">
-              {{ viewMode === 'split' ? 'Само карта' : 'Карта + списък' }}
+          @if (customRouteError) {
+            <p class="sidebar-error">{{ customRouteError }}</p>
+          }
+        </section>
+
+        <section class="sidebar-section">
+          <h3 class="sidebar-section-title">Само локации с конектор</h3>
+          <div class="view-toggle connector-toggle">
+            <button type="button" class="view-btn connector-btn" [class.active]="isConnectorTypeSelected('ccs')" (click)="toggleConnectorType('ccs')">
+              <app-connector-icon type="CCS" />
+              <span>CCS</span>
+            </button>
+            <button type="button" class="view-btn connector-btn" [class.active]="isConnectorTypeSelected('type2')" (click)="toggleConnectorType('type2')">
+              <app-connector-icon type="Type 2" />
+              <span>Type 2</span>
+            </button>
+            <button type="button" class="view-btn connector-btn" [class.active]="isConnectorTypeSelected('chademo')" (click)="toggleConnectorType('chademo')">
+              <app-connector-icon type="CHAdeMO" />
+              <span>CHAdeMO</span>
             </button>
           </div>
-        </div>
-      </mat-card-content>
-    </mat-card>
+        </section>
 
+        <section class="sidebar-section">
+          <h3 class="sidebar-section-title">Локации с мощност от минимум</h3>
+          <div class="view-toggle min-kw-toggle">
+            <button type="button" class="view-btn" [class.active]="isMinPowerSelected(22)" (click)="toggleMinPower(22)">≥ 22</button>
+            <button type="button" class="view-btn" [class.active]="isMinPowerSelected(50)" (click)="toggleMinPower(50)">≥ 50</button>
+            <button type="button" class="view-btn" [class.active]="isMinPowerSelected(100)" (click)="toggleMinPower(100)">≥ 100</button>
+            <button type="button" class="view-btn" [class.active]="isMinPowerSelected(150)" (click)="toggleMinPower(150)">≥ 150</button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <button type="button" class="view-btn view-toggle-single" (click)="toggleViewMode()">
+            {{ viewMode === 'split' ? 'Само карта' : 'Карта + списък' }}
+          </button>
+        </section>
+      </aside>
+
+      <div class="main-content">
     <div class="results-summary">
       @if (customRouteLoading) {
         <span class="location-status"><mat-icon class="spin">route</mat-icon> Зареждане на маршрут...</span>
@@ -136,7 +130,7 @@
       } @else if (locationError) {
         <span class="location-status location-warn">{{ locationError }}</span>
       }
-      <span class="count">Показани: {{ filteredStations.length }} от {{ stations.length }} станции</span>
+      <span class="count">Общо заредени станции за {{ countryLabel }}: {{ stations.length }}</span>
     </div>
 
     <div class="split-view" [class.view-map]="viewMode === 'map'">
@@ -156,6 +150,15 @@
       }
       @if (viewMode === 'split') {
         <div class="list-panel">
+          <mat-form-field appearance="outline" class="list-search-field">
+            <mat-label>Търси по име</mat-label>
+            <input matInput [(ngModel)]="filterSearch" (ngModelChange)="onFilterChange()" placeholder="Име, адрес, град..." />
+            @if (filterSearch) {
+              <button mat-icon-button matSuffix type="button" (click)="clearSearch()" matTooltip="Изчисти">
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </mat-form-field>
           @if (filteredStations.length === 0) {
             <p class="no-results">Няма станции при тези филтри.</p>
           } @else {
@@ -214,6 +217,8 @@
           }
         </div>
       }
+    </div>
+      </div>
     </div>
   }
 </div>
