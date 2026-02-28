@@ -152,7 +152,15 @@ export class StationsListComponent implements OnInit, OnDestroy {
         this.applyFilters();
         this.loading = false;
       },
-      error: () => {
+      error: (err) => {
+        // Допълнителен лог за по-лесно дебъгване (HTTP статус, CORS, 502 и т.н.)
+        // В браузъра виж пълния обект в DevTools → Console.
+        // eslint-disable-next-line no-console
+        console.error('Failed to load stations from API', {
+          url: this.stationService['apiUrl'],
+          country: this.stationCountry.getCountry(),
+          error: err,
+        });
         this.error = 'Failed to load stations. Is the backend running?';
         this.loading = false;
       },
