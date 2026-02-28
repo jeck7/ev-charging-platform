@@ -333,7 +333,11 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       coordinates: [[startLng, startLat], [endLng, endLat]] as [number, number][],
       alternative_routes: { target_count: 2, share_factor: 0.6, weight_factor: 1.4 },
     };
-    return fetch('/api/ors/v2/directions/driving-car/geojson', {
+    const orsUrl = environment.production
+      ? 'https://api.openrouteservice.org/v2/directions/driving-car/geojson'
+      : '/api/ors/v2/directions/driving-car/geojson';
+
+    return fetch(orsUrl, {
       method: 'POST',
       headers: {
         Authorization: key,
@@ -417,8 +421,11 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       return;
     }
     
-    // OSRM: alternatives=3 пита за до 3 алтернативи (публичният сървър често връща само 1)
-    const osrmUrl = `/api/osrm/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&alternatives=3`;
+    // OSRM: alternatives=3 пита за до 3 алтернативи
+    const osrmPath = `${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&alternatives=3`;
+    const osrmUrl = environment.production
+      ? `https://router.project-osrm.org/route/v1/driving/${osrmPath}`
+      : `/api/osrm/route/v1/driving/${osrmPath}`;
     
     console.log('Fetching route from OSRM (alternatives=3):', osrmUrl);
     
