@@ -1,7 +1,5 @@
 export const environment = {
   production: true,
-  // In production, use relative URLs (served through nginx gateway)
-  stationsApiUrl: '/api/stations',
-  sessionsApiUrl: '/api/sessions',
-  openRouteServiceApiKey: undefined as string | undefined,
+  stationsApiUrl: 'https://station-management-production-xxxx.up.railway.app/api/stations',
+  sessionsApiUrl: 'https://charging-sessions-production-yyyy.up.railway.app/api/sessions', // или махни ако не го ползваш
 };
