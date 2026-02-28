@@ -460,30 +460,19 @@ public class OpenChargeMapService {
                 // If Equipment is an array, iterate through each equipment
                 for (JsonNode eq : equipmentNode) {
                     String equipmentName = eq.has("Title") ? eq.get("Title").asText() : null;
-                    if (eq.has("Connections") && eq.get("Connections").isArray()) {
-                        for (JsonNode connNode : eq.get("Connections")) {
-                            addConnectorToList(list, connNode, equipmentName);
-                            hasEquipmentConnectors = true;
-                        }
-                    }
+                    addAllConnectionsFromNode(list, eq, equipmentName);
+                    if (!list.isEmpty()) hasEquipmentConnectors = true;
                 }
             } else if (equipmentNode.isObject()) {
-                // If Equipment is a single object (not array)
                 String equipmentName = equipmentNode.has("Title") ? equipmentNode.get("Title").asText() : null;
-                if (equipmentNode.has("Connections") && equipmentNode.get("Connections").isArray()) {
-                    for (JsonNode connNode : equipmentNode.get("Connections")) {
-                        addConnectorToList(list, connNode, equipmentName);
-                        hasEquipmentConnectors = true;
-                    }
-                }
+                addAllConnectionsFromNode(list, equipmentNode, equipmentName);
+                if (!list.isEmpty()) hasEquipmentConnectors = true;
             }
         }
         
         // Fallback: if no Equipment or Equipment had no Connections, use Connections directly from station
-        if (!hasEquipmentConnectors && stationNode.has("Connections") && stationNode.get("Connections").isArray()) {
-            for (JsonNode connNode : stationNode.get("Connections")) {
-                addConnectorToList(list, connNode, null);
-            }
+        if (!hasEquipmentConnectors && stationNode.has("Connections")) {
+            addAllConnectionsFromNode(list, stationNode, null);
         }
         
         if (list.isEmpty()) return null;
@@ -495,6 +484,19 @@ public class OpenChargeMapService {
         }
     }
     
+    /** Iterate Connections from a node (station or equipment): supports array or single object. */
+    private void addAllConnectionsFromNode(List<Map<String, Object>> list, JsonNode node, String stationName) {
+        if (!node.has("Connections")) return;
+        JsonNode connections = node.get("Connections");
+        if (connections.isArray()) {
+            for (JsonNode connNode : connections) {
+                addConnectorToList(list, connNode, stationName);
+            }
+        } else if (connections.isObject()) {
+            addConnectorToList(list, connections, stationName);
+        }
+    }
+
     /** Helper method to add a connector to the list with optional station name. */
     private void addConnectorToList(List<Map<String, Object>> list, JsonNode connNode, String stationName) {
         String type = connNode.has("ConnectionType") && connNode.get("ConnectionType").has("Title")

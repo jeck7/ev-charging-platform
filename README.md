@@ -1,6 +1,30 @@
-# eMobility EV Charging Platform
+📈 eMobility EV Charging Platform  
+Live: (self-hosted / private deployments)
 
-EV charging services platform – microservices backend (Java/Spring Boot) and Angular driver portal.
+Platform for managing and visualizing EV charging stations with routing, connector-level pricing, and integrations to public data sources and charging protocols.
+
+Tech Stack: Angular 17 (standalone), TypeScript, Spring Boot 3 (Java 17), PostgreSQL, Docker, nginx API Gateway, mTLS, Node.js (Playwright Fines scraper)
+
+Key Features:
+
+📍 Interactive Map & List - filter by connector type (CCS, Type 2, CHAdeMO), minimum power, operator and country  
+🗺️ Route Planning - custom from/to search, show only stations along the route, persistent route state in the UI  
+🔌 Connector-Level Details - per-connector type, power (kW), price, and grouping by equipment/station on the same location  
+📥 Data Imports - bulk import of stations from Open Charge Map and Fines with automatic connector extraction from popups  
+💸 Price Enrichment - optional integration with external price providers plus per-location default pricing overrides  
+⚡ Charging Protocol Integrations - OCPP WebSocket endpoint, ISO 15118 Plug & Charge hook, Tesla API integration points  
+🧩 Microservices Architecture - separate station-management and charging-sessions services on PostgreSQL  
+🛡️ Secure Infrastructure - mTLS between services, nginx API gateway, Docker & Docker Compose setup  
+📊 Admin Tools - import jobs, country-level stats, price enrichment status and manual station management
+
+💼 Available For:
+
+✅ Self-hosting - full EV charging platform for operators, fleets, and internal tools  
+✅ Custom Development - additional filters, UI/UX changes, and new integrations to operators/maps  
+✅ API Integration - embed station, connector, and pricing data into your applications  
+✅ Consulting - architecture, deployment and integration with existing charging infrastructure  
+
+📬 Interested? Contact me to discuss how eMobility EV Charging Platform can support your EV charging operations.
 
 ## Tech Stack
 

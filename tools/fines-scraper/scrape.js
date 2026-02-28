@@ -10,8 +10,10 @@ import { chromium } from 'playwright';
 const URL = 'https://finescharging.com/locations';
 const TIMEOUT_MS = 25000;
 const WAIT_AFTER_LOAD_MS = 8000;
-const POPUP_READ_DELAY_MS = 600;
-const CLICK_BETWEEN_MARKERS_MS = 350;
+const POPUP_READ_DELAY_MS = 280;
+const CLICK_BETWEEN_MARKERS_MS = 180;
+const ENRICH_PROGRESS_EVERY = 25;
+const ENRICH_POINT_TIMEOUT_MS = 8000;
 const DEBUG = process.env.DEBUG === '1' || process.argv.includes('--debug');
 
 function hasCoords(obj) {
@@ -91,17 +93,9 @@ function parsePopupTextWithStations(raw) {
     }
     const connMatch = line.match(connectorLine);
     if (connMatch) {
-      const type = connMatch[1].trim();
       const powerKw = parseInt(connMatch[2], 10);
-      const usageCost = (connMatch[3] || '').trim() || undefined;
       if (!Number.isNaN(powerKw)) {
         if (maxPowerKw == null || powerKw > maxPowerKw) maxPowerKw = powerKw;
-        result.connectors.push({
-          type: type || 'CCS',
-          powerKw,
-          usageCost: usageCost || '0.39 EUR / kWh',
-          stationName: currentStationName || undefined,
-        });
       }
       continue;
     }
@@ -117,6 +111,21 @@ function parsePopupTextWithStations(raw) {
   const powerMatch = raw.match(/(\d+)\s*(?:kW|кВт)/i) || raw.match(/мощност[^\d]*(\d+)/i);
   if (powerMatch) result.maxPowerKw = parseInt(powerMatch[1], 10);
   if (maxPowerKw != null) result.maxPowerKw = result.maxPowerKw != null ? Math.max(result.maxPowerKw, maxPowerKw) : maxPowerKw;
+
+  // Източник на брой конектори: глобален regex по целия текст (улавя всички повторения, дори на един ред)
+  const connectorGlobal = /(.+?)\s+конектор\s+с\s+максимална\s+мощност\s+(\d+)\s*kW?\s*(?:и\s+цена\s+([^.]+?))?(?:\.|$)/gi;
+  const globalMatches = [...raw.matchAll(connectorGlobal)];
+  result.connectors = globalMatches.map((g) => {
+    const type = (g[1] || '').trim() || 'CCS';
+    const powerKw = parseInt(g[2], 10);
+    const usageCost = (g[3] || '').trim() || '0.39 EUR / kWh';
+    return {
+      type: Number.isNaN(powerKw) ? 'CCS' : type,
+      powerKw: Number.isNaN(powerKw) ? (maxPowerKw || 0) : powerKw,
+      usageCost,
+      stationName: currentStationName || undefined,
+    };
+  }).filter((c) => !Number.isNaN(c.powerKw) && c.powerKw > 0);
 
   return result;
 }
@@ -439,19 +448,16 @@ async function main() {
     }).catch(() => []);
 
     if (fromDom.length > 0) captured = fromDom;
+  }
 
-    const needsEnrichment =
-      captured.length > 0 &&
-      captured.every(
-        (s) =>
-          !(s.address && s.address.trim()) &&
-          !(s.city && s.city.trim()) &&
-          s.name === 'Fines Charging' &&
-          (s.maxPowerKw == null || s.maxPowerKw === 0)
-      );
-
-    if (needsEnrichment) {
-      const positions = await page
+  if (captured.length > 0) {
+    let positions = [];
+    for (const attempt of [0, 1]) {
+      if (attempt > 0) {
+        process.stderr.write(`[DEBUG] Retrying marker layers in 3s...\n`);
+        await page.waitForTimeout(3000);
+      }
+      positions = await page
         .evaluate(() => {
           const findMarkerLayers = (map) => {
             if (!map || !map._layers || typeof map._layers !== 'object') return null;
@@ -482,32 +488,101 @@ async function main() {
           return [];
         })
         .catch(() => []);
+      if (positions.length > 0) break;
+    }
 
-      if (positions.length > 0 && DEBUG) process.stderr.write(`[DEBUG] Enriching ${positions.length} markers via openPopup\n`);
+    const positionsToUse = positions.length > 0 ? positions : [];
+    if (positions.length === 0 && captured.length > 0 && DEBUG) {
+      process.stderr.write(`[DEBUG] No marker layers from map – skipping popup enrichment (output has no connectors). Run again or check map.\n`);
+    }
+    if (positionsToUse.length > 0 && DEBUG) process.stderr.write(`[DEBUG] Enriching ${positionsToUse.length} points (connectors from popup)\n`);
 
-      if (positions.length > 0) {
-        const enriched = [];
-        const total = Math.min(positions.length, 500);
-        for (let i = 0; i < total; i++) {
-          try {
+    const closeAnyPopup = async () => {
+      await page.evaluate(() => {
+        const p = document.querySelector('.leaflet-popup .leaflet-popup-close-button');
+        if (p) p.click();
+      }).catch(() => {});
+    };
+
+    if (positionsToUse.length > 0) {
+      const total = Math.min(positionsToUse.length, 500);
+      for (let i = 0; i < total; i++) {
+        const lat = positionsToUse[i].lat;
+        const lng = positionsToUse[i].lng;
+        const step = async () => {
+          await closeAnyPopup();
+          await page.waitForTimeout(100);
+          if (positions.length > 0) {
             await page.evaluate((idx) => {
               if (window.__finesMarkerLayers && window.__finesMarkerLayers[idx]) window.__finesMarkerLayers[idx].openPopup();
             }, i);
-            await page.waitForSelector('.leaflet-popup-content', { state: 'visible', timeout: 3000 }).catch(() => {});
-            await page.waitForTimeout(POPUP_READ_DELAY_MS);
-            const text = await page
-              .evaluate(() => {
-                const el = document.querySelector('.leaflet-popup-content');
-                return el ? (el.innerText || el.textContent || '').trim() : '';
-              })
-              .catch(() => '');
-            await page.evaluate((idx) => {
-              if (window.__finesMarkerLayers && window.__finesMarkerLayers[idx]) window.__finesMarkerLayers[idx].closePopup();
-            }, i);
-            const { name, address, city, maxPowerKw, connectors } = parsePopupText(text);
-            enriched.push({
-              latitude: positions[i].lat,
-              longitude: positions[i].lng,
+          } else {
+            await page.evaluate(({ lat, lng }) => {
+              const tol = 0.0003;
+              const cand = [window.map, window.leafletMap, window.maps, window.__map, window.app?.map, window.$map];
+              for (const map of cand) {
+                if (!map || !map._layers || typeof map._layers !== 'object') continue;
+                for (const layer of Object.values(map._layers)) {
+                  if (layer && layer._latlng && typeof layer.openPopup === 'function') {
+                    const L = layer._latlng;
+                    if (Math.abs(L.lat - lat) < tol && Math.abs(L.lng - lng) < tol) {
+                      layer.openPopup();
+                      return;
+                    }
+                  }
+                }
+              }
+            }, { lat, lng });
+          }
+          await page.waitForSelector('.leaflet-popup-content', { state: 'visible', timeout: 2000 }).catch(() => {});
+          await page.waitForTimeout(POPUP_READ_DELAY_MS);
+          const text = await page
+            .evaluate(() => {
+              const el = document.querySelector('.leaflet-popup-content');
+              return el ? (el.innerText || el.textContent || '').trim() : '';
+            })
+            .catch(() => '');
+          const connectorTypesFromDom = await page
+            .evaluate(() => {
+              const wrap = document.querySelector('.leaflet-popup-content .location_popup_connectors');
+              if (!wrap) return [];
+              const imgs = wrap.querySelectorAll('img[src]');
+              return Array.from(imgs).map((img) => {
+                const s = (img.getAttribute('src') || '').toLowerCase();
+                if (s.includes('type2') || s.includes('type-2')) return 'Type 2';
+                if (s.includes('chademo')) return 'CHAdeMO';
+                return 'CCS';
+              });
+            })
+            .catch(() => []);
+          await closeAnyPopup();
+          const parsed = parsePopupText(text);
+          const { name, address, city, maxPowerKw } = parsed;
+          const powerKw = parsed.maxPowerKw != null ? parsed.maxPowerKw : 120;
+          const usageCost = '0.39 EUR / kWh';
+          const connectors =
+            connectorTypesFromDom.length > 0
+              ? connectorTypesFromDom.map((type) => ({ type, powerKw, usageCost }))
+              : parsed.connectors;
+          const tolerance = 0.0002;
+          let match = captured.find(
+            (s) => Math.abs((s.latitude ?? s.lat) - lat) < tolerance && Math.abs((s.longitude ?? s.lng) - lng) < tolerance
+          );
+          if (!match && captured.length > 0) {
+            const dist = (s) => Math.hypot((s.latitude ?? s.lat) - lat, (s.longitude ?? s.lng) - lng);
+            const closest = captured.reduce((a, b) => (dist(a) < dist(b) ? a : b));
+            if (dist(closest) < 0.001) match = closest;
+          }
+          if (match) {
+            if (Array.isArray(connectors) && connectors.length > 0) match.connectors = connectors;
+            if (name && name !== 'Fines Charging') match.name = name;
+            if (address && address.trim()) match.address = address.trim();
+            if (city && city.trim()) match.city = city.trim();
+            if (maxPowerKw != null) match.maxPowerKw = maxPowerKw;
+          } else if (positions.length > 0) {
+            captured.push({
+              latitude: lat,
+              longitude: lng,
               name: name || 'Fines Charging',
               address: address || '',
               city: city || '',
@@ -515,10 +590,21 @@ async function main() {
               maxPowerKw: maxPowerKw != null ? maxPowerKw : null,
               connectors: Array.isArray(connectors) && connectors.length > 0 ? connectors : undefined,
             });
-          } catch (_) {}
-          await page.waitForTimeout(CLICK_BETWEEN_MARKERS_MS);
+          }
+        };
+        try {
+          await Promise.race([
+            step(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ENRICH_POINT_TIMEOUT_MS)),
+          ]);
+        } catch (e) {
+          await closeAnyPopup().catch(() => {});
+          if (DEBUG && e?.message === 'timeout') process.stderr.write(`[DEBUG] Timeout point ${i + 1}/${total}\n`);
         }
-        if (enriched.length > 0) captured = enriched;
+        if ((i + 1) % ENRICH_PROGRESS_EVERY === 0 || i === 0) {
+          process.stderr.write(`Enriched ${i + 1}/${total} points\n`);
+        }
+        await page.waitForTimeout(CLICK_BETWEEN_MARKERS_MS);
       }
     }
   }

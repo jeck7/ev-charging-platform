@@ -83,8 +83,8 @@
                       <app-connector-icon [type]="conn.type" />
                       <span class="connector-text">
                         <strong>{{ conn.type }}</strong> конектор с максимална мощност <strong>{{ conn.powerKw }} kW</strong>
-                        @if (conn.usageCost || station.usageCost) {
-                          и цена {{ conn.usageCost ?? station.usageCost }}
+                        @if (conn.usageCost || station?.usageCost) {
+                          и цена {{ conn.usageCost ?? station?.usageCost }}
                         }
                       </span>
                     </li>
