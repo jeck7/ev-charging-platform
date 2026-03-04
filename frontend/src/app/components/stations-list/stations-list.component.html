@@ -3,7 +3,7 @@
   @if (loading) {
     <div class="loading">
       <mat-spinner diameter="40"></mat-spinner>
-      <span>Зареждане на станции...</span>
+      <span>{{ i18n.t('stations.loading') }}</span>
     </div>
   } @else if (error) {
     <mat-card class="error-card">
@@ -11,7 +11,7 @@
         <mat-icon color="warn">error_outline</mat-icon>
         <p>{{ error }}</p>
         <button mat-raised-button color="primary" (click)="loadStations()">
-          Опитай отново
+          {{ i18n.t('stations.retry') }}
         </button>
       </mat-card-content>
     </mat-card>
@@ -23,8 +23,8 @@
             <div>
               <mat-icon class="prompt-icon">info</mat-icon>
               <div>
-                <strong>Няма много станции в базата данни</strong>
-                <p>Импортирайте станции от Open Charge Map за България, за да видите всички налични станции (включително в Люлин).</p>
+                <strong>{{ i18n.t('stations.importPrompt.title') }}</strong>
+                <p>{{ i18n.t('stations.importPrompt.body') }}</p>
               </div>
             </div>
             <button
@@ -33,7 +33,7 @@
               (click)="importStationsFromBulgaria()"
             >
               <mat-icon>cloud_download</mat-icon>
-              Импортирай станции от България
+              {{ i18n.t('stations.importPrompt.button') }}
             </button>
           </div>
         </mat-card-content>
@@ -44,24 +44,38 @@
         <mat-card-content>
           <div class="import-prompt-content">
             <mat-spinner diameter="24"></mat-spinner>
-            <span>Импортиране на станции от Open Charge Map...</span>
+            <span>{{ i18n.t('stations.importPrompt.button') }}</span>
           </div>
         </mat-card-content>
       </mat-card>
     }
     <div class="page-layout">
       <aside class="sidebar">
-        <h2 class="sidebar-title">Търсене на Зарядни станции</h2>
+        <h2 class="sidebar-title">
+          {{ i18n.t('stations.sidebar.searchTitle') }}
+        </h2>
 
         <section class="sidebar-section">
-          <h3 class="sidebar-section-title">Покажи само станции по маршрут</h3>
+          <h3 class="sidebar-section-title">
+            {{ i18n.t('stations.sidebar.routeTitle') }}
+          </h3>
           <mat-form-field appearance="outline" class="sidebar-field">
-            <mat-label>Пътувам от</mat-label>
-            <input matInput [(ngModel)]="customRouteFrom" placeholder="напр. София" (keyup.enter)="loadCustomRoute()" />
+            <mat-label>{{ i18n.t('stations.sidebar.fromLabel') }}</mat-label>
+            <input
+              matInput
+              [(ngModel)]="customRouteFrom"
+              [placeholder]="i18n.t('stations.sidebar.fromPlaceholder')"
+              (keyup.enter)="loadCustomRoute()"
+            />
           </mat-form-field>
           <mat-form-field appearance="outline" class="sidebar-field">
-            <mat-label>Пътувам до</mat-label>
-            <input matInput [(ngModel)]="customRouteTo" placeholder="напр. Пловдив" (keyup.enter)="loadCustomRoute()" />
+            <mat-label>{{ i18n.t('stations.sidebar.toLabel') }}</mat-label>
+            <input
+              matInput
+              [(ngModel)]="customRouteTo"
+              [placeholder]="i18n.t('stations.sidebar.toPlaceholder')"
+              (keyup.enter)="loadCustomRoute()"
+            />
           </mat-form-field>
           <div class="sidebar-actions">
             <button mat-stroked-button color="primary" class="sidebar-btn" (click)="loadCustomRoute()" [disabled]="customRouteLoading">
@@ -70,10 +84,15 @@
               } @else {
                 <mat-icon>route</mat-icon>
               }
-              Маршрут
+              {{ i18n.t('stations.sidebar.routeButton') }}
             </button>
             @if (customRoute) {
-              <button mat-icon-button type="button" (click)="clearCustomRoute()" matTooltip="Изчисти маршрут">
+              <button
+                mat-icon-button
+                type="button"
+                (click)="clearCustomRoute()"
+                [matTooltip]="i18n.t('stations.sidebar.clearRouteTooltip')"
+              >
                 <mat-icon>close</mat-icon>
               </button>
             }
@@ -84,7 +103,9 @@
         </section>
 
         <section class="sidebar-section">
-          <h3 class="sidebar-section-title">Само локации с конектор</h3>
+          <h3 class="sidebar-section-title">
+            {{ i18n.t('stations.sidebar.connectorTitle') }}
+          </h3>
           <div class="view-toggle connector-toggle">
             <button type="button" class="view-btn connector-btn" [class.active]="isConnectorTypeSelected('ccs')" (click)="toggleConnectorType('ccs')">
               <app-connector-icon type="CCS" />
@@ -102,7 +123,9 @@
         </section>
 
         <section class="sidebar-section">
-          <h3 class="sidebar-section-title">Локации с мощност от минимум</h3>
+          <h3 class="sidebar-section-title">
+            {{ i18n.t('stations.sidebar.minPowerTitle') }}
+          </h3>
           <div class="view-toggle min-kw-toggle">
             <button type="button" class="view-btn" [class.active]="isMinPowerSelected(22)" (click)="toggleMinPower(22)">≥ 22</button>
             <button type="button" class="view-btn" [class.active]="isMinPowerSelected(50)" (click)="toggleMinPower(50)">≥ 50</button>
@@ -113,7 +136,11 @@
 
         <section class="sidebar-section">
           <button type="button" class="view-btn view-toggle-single" (click)="toggleViewMode()">
-            {{ viewMode === 'split' ? 'Само карта' : 'Карта + списък' }}
+            {{
+              viewMode === 'split'
+                ? i18n.t('stations.sidebar.viewToggle.mapOnly')
+                : i18n.t('stations.sidebar.viewToggle.split')
+            }}
           </button>
         </section>
       </aside>
@@ -121,16 +148,32 @@
       <div class="main-content">
     <div class="results-summary">
       @if (customRouteLoading) {
-        <span class="location-status"><mat-icon class="spin">route</mat-icon> Зареждане на маршрут...</span>
+        <span class="location-status">
+          <mat-icon class="spin">route</mat-icon>
+          {{ i18n.t('stations.location.loadingRoute') }}
+        </span>
       }
       @if (locationLoading && !customRouteLoading) {
-        <span class="location-status"><mat-icon class="spin">my_location</mat-icon> Определяне на вашата локация...</span>
+        <span class="location-status">
+          <mat-icon class="spin">my_location</mat-icon>
+          {{ i18n.t('stations.location.loading') }}
+        </span>
       } @else if (userLocation && !customRouteLoading) {
-        <span class="location-status location-ok"><mat-icon>my_location</mat-icon> Станции сортирани по близост до вас</span>
+        <span class="location-status location-ok">
+          <mat-icon>my_location</mat-icon>
+          {{ i18n.t('stations.location.sortedByDistance') }}
+        </span>
       } @else if (locationError) {
         <span class="location-status location-warn">{{ locationError }}</span>
       }
-      <span class="count">Общо заредени станции за {{ countryLabel }}: {{ stations.length }}</span>
+      <span class="count">
+        {{
+          i18n.t('stations.summary.count', {
+            country: countryLabel,
+            count: stations.length,
+          })
+        }}
+      </span>
     </div>
 
     <div class="split-view" [class.view-map]="viewMode === 'map'">
@@ -151,16 +194,29 @@
       @if (viewMode === 'split') {
         <div class="list-panel">
           <mat-form-field appearance="outline" class="list-search-field">
-            <mat-label>Търси по име</mat-label>
-            <input matInput [(ngModel)]="filterSearch" (ngModelChange)="onFilterChange()" placeholder="Име, адрес, град..." />
+            <mat-label>{{ i18n.t('stations.search.label') }}</mat-label>
+            <input
+              matInput
+              [(ngModel)]="filterSearch"
+              (ngModelChange)="onFilterChange()"
+              [placeholder]="i18n.t('stations.search.placeholder')"
+            />
             @if (filterSearch) {
-              <button mat-icon-button matSuffix type="button" (click)="clearSearch()" matTooltip="Изчисти">
+              <button
+                mat-icon-button
+                matSuffix
+                type="button"
+                (click)="clearSearch()"
+                [matTooltip]="i18n.t('stations.search.clearTooltip')"
+              >
                 <mat-icon>close</mat-icon>
               </button>
             }
           </mat-form-field>
           @if (filteredStations.length === 0) {
-            <p class="no-results">Няма станции при тези филтри.</p>
+            <p class="no-results">
+              {{ i18n.t('stations.noResults') }}
+            </p>
           } @else {
             <div class="stations-grid">
               @for (station of filteredStations; track station.id) {

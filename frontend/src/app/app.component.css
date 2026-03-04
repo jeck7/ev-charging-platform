@@ -65,6 +65,27 @@
   margin-left: 0.75rem;
 }
 
+.lang-select {
+  margin-right: 0.75rem;
+  min-width: 90px;
+  max-width: 100px;
+  flex: 0 0 auto;
+  color: white;
+}
+
+.lang-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.lang-label {
+  font-size: 0.85rem;
+  vertical-align: middle;
+}
+
 .user-btn {
   color: white;
 }

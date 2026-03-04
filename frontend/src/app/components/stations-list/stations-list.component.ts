@@ -19,6 +19,7 @@ import type { RoutePoint } from '../../data/highway-routes';
 import { StationsMapComponent } from '../stations-map/stations-map.component';
 import { ConnectorIconComponent } from '../connector-icon/connector-icon.component';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { I18nService } from '../../services/i18n.service';
 
 type ViewMode = 'split' | 'map';
 
@@ -93,7 +94,8 @@ export class StationsListComponent implements OnInit, OnDestroy {
     private importService: StationImportService,
     private stationCountry: StationCountryService,
     private routeSearchState: RouteSearchStateService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    public i18n: I18nService
   ) {}
 
   ngOnInit(): void {
@@ -117,7 +119,7 @@ export class StationsListComponent implements OnInit, OnDestroy {
 
   requestUserLocation(): void {
     if (!navigator.geolocation) {
-      this.locationError = 'Геолокацията не се поддържа от браузъра.';
+      this.locationError = this.i18n.t('stations.geo.notSupported');
       return;
     }
     this.locationLoading = true;
@@ -133,7 +135,7 @@ export class StationsListComponent implements OnInit, OnDestroy {
       },
       () => {
         this.locationLoading = false;
-        this.locationError = 'Локацията не е намерена. Показваме станции по подразбиране.';
+        this.locationError = this.i18n.t('stations.geo.notFound');
         this.applyFilters();
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }

@@ -10,40 +10,54 @@
     <mat-card-content>
       <!-- Statistics -->
       <div class="stats-section" *ngIf="stats">
-        <h3>Статистика</h3>
+        <h3>{{ i18n.t('admin.stats') }}</h3>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-value">{{ stats.totalStations }}</div>
-            <div class="stat-label">Общо Станции</div>
+            <div class="stat-label">{{ i18n.t('admin.stats.total') }}</div>
           </div>
           <div class="stat-card">
             <div class="stat-value">{{ stats.activeStations }}</div>
-            <div class="stat-label">Активни</div>
+            <div class="stat-label">{{ i18n.t('admin.stats.active') }}</div>
           </div>
           <div class="stat-card" *ngIf="stats.countryStations !== undefined">
             <div class="stat-value">{{ stats.countryStations }}</div>
-            <div class="stat-label">В {{ selectedCountry }}</div>
+            <div class="stat-label">
+              {{
+                i18n.t('admin.stats.inCountry', {
+                  country: selectedCountry,
+                })
+              }}
+            </div>
           </div>
         </div>
 
         <div class="last-import" *ngIf="stats.lastImport">
-          <strong>Последен импорт:</strong> {{ formatDate(stats.lastImport.date) }}<br>
-          Импортирани: {{ stats.lastImport.imported }}, Актуализирани: {{ stats.lastImport.updated }}
+          <strong>{{ i18n.t('admin.stats.lastImport') }}</strong>
+          {{ formatDate(stats.lastImport.date) }}<br />
+          {{
+            i18n.t('admin.stats.lastImportSummary', {
+              imported: stats.lastImport.imported,
+              updated: stats.lastImport.updated,
+            })
+          }}
         </div>
       </div>
 
       <!-- Import Section -->
       <div class="import-section">
-        <h3>Импорт от Open Charge Map</h3>
+        <h3>{{ i18n.t('admin.import.title') }}</h3>
         
         <mat-form-field appearance="outline">
-          <mat-label>Държава</mat-label>
+          <mat-label>{{ i18n.t('admin.import.countryLabel') }}</mat-label>
           <mat-select [(ngModel)]="selectedCountry" (selectionChange)="loadStats()">
             <mat-option *ngFor="let country of countries" [value]="country.code">
               {{ country.name }} ({{ country.code }})
             </mat-option>
           </mat-select>
-          <mat-hint>Използва се и за списъка със станции на началната страница.</mat-hint>
+          <mat-hint>
+            {{ i18n.t('admin.import.countryHint') }}
+          </mat-hint>
         </mat-form-field>
 
         <div class="import-actions">
@@ -54,7 +68,11 @@
             [disabled]="isImporting"
           >
             <mat-icon>cloud_download</mat-icon>
-            {{ isImporting ? 'Импортиране...' : 'Стартирай Импорт' }}
+            {{
+              isImporting
+                ? i18n.t('admin.import.starting')
+                : i18n.t('admin.import.startButton')
+            }}
           </button>
           <button
             mat-stroked-button
@@ -63,7 +81,7 @@
             title="Импорт само на станции на Fines Charging за БГ от Open Charge Map"
           >
             <mat-icon>ev_station</mat-icon>
-            Импорт Fines (от OCM)
+            {{ i18n.t('admin.import.finesButton') }}
           </button>
           <button
             mat-stroked-button
@@ -73,23 +91,35 @@
           >
             <mat-spinner *ngIf="isFinesScraping" diameter="20" class="btn-spinner"></mat-spinner>
             <mat-icon *ngIf="!isFinesScraping">link</mat-icon>
-            {{ isFinesScraping ? 'Обработка...' : 'Fines (скрапинг)' }}
+            {{
+              isFinesScraping
+                ? i18n.t('admin.import.starting')
+                : i18n.t('admin.import.finesScrapeButton')
+            }}
           </button>
         </div>
 
         <div class="fines-scrape-status" *ngIf="isFinesScraping">
           <mat-spinner diameter="24"></mat-spinner>
-          <span>Скрапинг и импорт в процес. Моля изчакайте (може да отнеме до минута).</span>
+          <span>{{ i18n.t('admin.import.finesScrapeRunning') }}</span>
         </div>
 
         <div class="fines-scrape-result" *ngIf="finesScrapeResult">
-          <span *ngIf="finesScrapeResult.success">Скрапинг: импортирани {{ finesScrapeResult.imported }}, актуализирани {{ finesScrapeResult.updated }} (общо {{ finesScrapeResult.total }})</span>
+          <span *ngIf="finesScrapeResult.success">
+            {{
+              i18n.t('admin.import.finesScrapeSummary', {
+                imported: finesScrapeResult.imported ?? 0,
+                updated: finesScrapeResult.updated ?? 0,
+                total: finesScrapeResult.total ?? 0,
+              })
+            }}
+          </span>
           <span *ngIf="!finesScrapeResult.success" class="error">{{ finesScrapeResult.error }}</span>
         </div>
 
         <!-- Import Status -->
         <div class="import-status" *ngIf="importStatus">
-          <h4>Статус на Импорт</h4>
+          <h4>{{ i18n.t('admin.import.statusTitle') }}</h4>
           <div class="status-info">
             <div class="status-badge" [style.color]="getStatusColor(importStatus.status)">
               <mat-icon *ngIf="importStatus.status === 'RUNNING'">sync</mat-icon>
@@ -100,14 +130,26 @@
             
             <div class="status-details" *ngIf="importStatus.status === 'RUNNING'">
               <mat-spinner diameter="20"></mat-spinner>
-              <span>Импортиране в процес...</span>
+              <span>{{ i18n.t('admin.import.status.running') }}</span>
             </div>
 
             <div class="status-details" *ngIf="importStatus.status === 'COMPLETED'">
-              <p><strong>Импортирани:</strong> {{ importStatus.imported }}</p>
-              <p><strong>Актуализирани:</strong> {{ importStatus.updated }}</p>
-              <p><strong>Пропуснати:</strong> {{ importStatus.skipped }}</p>
-              <p><strong>Завършен:</strong> {{ formatDate(importStatus.completedAt) }}</p>
+              <p>
+                <strong>{{ i18n.t('admin.import.status.completed.imported') }}</strong>
+                {{ importStatus.imported }}
+              </p>
+              <p>
+                <strong>{{ i18n.t('admin.import.status.completed.updated') }}</strong>
+                {{ importStatus.updated }}
+              </p>
+              <p>
+                <strong>{{ i18n.t('admin.import.status.completed.skipped') }}</strong>
+                {{ importStatus.skipped }}
+              </p>
+              <p>
+                <strong>{{ i18n.t('admin.import.status.completed.completedAt') }}</strong>
+                {{ formatDate(importStatus.completedAt) }}
+              </p>
             </div>
 
             <div class="status-details" *ngIf="importStatus.status === 'FAILED'">
@@ -119,11 +161,28 @@
 
       <!-- Enrich prices (Chargeprice / Eco-Movement) -->
       <div class="import-section enrich-section">
-        <h3>Обогатяване на цени (Chargeprice / Eco-Movement)</h3>
-        <p class="enrich-desc">Попълва цени (EUR/kWh) за станциите чрез съпоставяне по координати с Chargeprice или Eco-Movement. Задайте <code>chargeprice.api.key</code> в сървъра (demo: <a href="https://tally.so/r/w4pJAX" target="_blank" rel="noopener">заявка за достъп</a>).</p>
+        <h3>{{ i18n.t('admin.enrich.title') }}</h3>
+        <p class="enrich-desc">
+          {{ i18n.t('admin.enrich.desc') }}
+          <code>chargeprice.api.key</code>
+        </p>
         <div class="enrich-status" *ngIf="enrichStatus">
-          <span>Chargeprice: {{ enrichStatus.chargeprice ? 'конфигуриран' : 'не е зададен ключ' }}</span>
-          <span>Eco-Movement: {{ enrichStatus.ecomovement ? 'конфигуриран' : 'не е зададен токен' }}</span>
+          <span>
+            Chargeprice:
+            {{
+              enrichStatus.chargeprice
+                ? i18n.t('admin.enrich.chargepriceConfigured')
+                : i18n.t('admin.enrich.chargepriceNotConfigured')
+            }}
+          </span>
+          <span>
+            Eco-Movement:
+            {{
+              enrichStatus.ecomovement
+                ? i18n.t('admin.enrich.ecomovementConfigured')
+                : i18n.t('admin.enrich.ecomovementNotConfigured')
+            }}
+          </span>
         </div>
         <div class="import-actions">
           <button
@@ -133,7 +192,11 @@
             [disabled]="isEnriching"
           >
             <mat-icon>euro</mat-icon>
-            {{ isEnriching ? 'Обогатяване...' : 'Обогати цени за ' + selectedCountry }}
+            {{
+              isEnriching
+                ? i18n.t('admin.import.starting')
+                : i18n.t('admin.enrich.button', { country: selectedCountry })
+            }}
           </button>
         </div>
         <div class="enrich-result" *ngIf="enrichResult">
@@ -145,10 +208,7 @@
       <!-- Info Section -->
       <div class="info-section">
         <mat-icon>info</mat-icon>
-        <p>
-          Импортът се извършва автоматично всеки ден в 02:00 за България.
-          Можете да стартирате ръчен импорт по всяко време.
-        </p>
+        <p>{{ i18n.t('admin.info.text') }}</p>
       </div>
     </mat-card-content>
   </mat-card>

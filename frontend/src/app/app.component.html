@@ -2,15 +2,29 @@
   <mat-toolbar color="primary" class="navbar">
     <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="logo">
       <mat-icon>ev_station</mat-icon>
-      eMobility EV Charging
+      {{ i18n.t('app.title') }}
     </a>
-    <span class="nav-subtitle">Driver Portal</span>
+    <span class="nav-subtitle">{{ i18n.t('app.subtitle') }}</span>
     <span class="nav-spacer"></span>
+    <mat-select
+      class="lang-select"
+      [value]="i18n.currentLang"
+      (selectionChange)="setLang($event.value)"
+    >
+      <mat-select-trigger>
+        <mat-icon class="lang-icon">language</mat-icon>
+        <span class="lang-label">
+          {{ i18n.currentLang === 'bg' ? 'BG' : 'EN' }}
+        </span>
+      </mat-select-trigger>
+      <mat-option value="bg">BG</mat-option>
+      <mat-option value="en">EN</mat-option>
+    </mat-select>
     @if (auth.isLoggedIn()) {
       @if (auth.currentUser()?.role === 'ADMIN') {
         <a routerLink="/admin" routerLinkActive="active" class="nav-link">
           <mat-icon>admin_panel_settings</mat-icon>
-          Админ
+          {{ i18n.t('nav.admin') }}
         </a>
       }
       <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
@@ -20,23 +34,23 @@
       <mat-menu #userMenu="matMenu">
         <button mat-menu-item routerLink="/">
           <mat-icon>home</mat-icon>
-          <span>Начало</span>
+          <span>{{ i18n.t('nav.home') }}</span>
         </button>
         @if (auth.currentUser()?.role === 'ADMIN') {
           <button mat-menu-item routerLink="/admin">
             <mat-icon>admin_panel_settings</mat-icon>
-            <span>Админ</span>
+            <span>{{ i18n.t('nav.admin') }}</span>
           </button>
         }
         <button mat-menu-item (click)="auth.logout()">
           <mat-icon>logout</mat-icon>
-          <span>Изход</span>
+          <span>{{ i18n.t('nav.logout') }}</span>
         </button>
       </mat-menu>
     } @else {
       <a routerLink="/login" class="nav-link">
         <mat-icon>login</mat-icon>
-        Вход
+        {{ i18n.t('nav.login') }}
       </a>
     }
   </mat-toolbar>
@@ -48,44 +62,44 @@
       <div class="footer-top">
         <a routerLink="/" class="footer-logo">
           <mat-icon>ev_station</mat-icon>
-          <span>eMobility EV Charging</span>
+          <span>{{ i18n.t('app.title') }}</span>
         </a>
-        <p class="footer-tagline">Портал за зареждане на електропревозни средства. Намерете станции, цени и маршрути.</p>
+        <p class="footer-tagline">{{ i18n.t('footer.tagline') }}</p>
       </div>
       <div class="footer-grid">
         <div class="footer-col">
-          <h4>Навигация</h4>
+          <h4>{{ i18n.t('footer.nav') }}</h4>
           <ul>
-            <li><a routerLink="/">Начало</a></li>
-            <li><a routerLink="/">Станции на картата</a></li>
+            <li><a routerLink="/">{{ i18n.t('nav.home') }}</a></li>
+            <li><a routerLink="/">{{ i18n.t('footer.nav.map') }}</a></li>
             @if (!auth.isLoggedIn()) {
-              <li><a routerLink="/login">Вход</a></li>
+              <li><a routerLink="/login">{{ i18n.t('nav.login') }}</a></li>
             }
             @if (auth.isLoggedIn() && auth.currentUser()?.role === 'ADMIN') {
-              <li><a routerLink="/admin">Админ панел</a></li>
+              <li><a routerLink="/admin">{{ i18n.t('footer.nav.adminPanel') }}</a></li>
             }
           </ul>
         </div>
         <div class="footer-col">
-          <h4>Платформа</h4>
+          <h4>{{ i18n.t('footer.platform') }}</h4>
           <ul>
-            <li>Зарядни станции в България</li>
-            <li>Филтър по маршрут (напр. А1 Тракия)</li>
-            <li>Цени и типове конектори</li>
-            <li>Импорт от Open Charge Map</li>
+            <li>{{ i18n.t('footer.platform.stationsBg') }}</li>
+            <li>{{ i18n.t('footer.platform.routeFilter') }}</li>
+            <li>{{ i18n.t('footer.platform.pricesConnectors') }}</li>
+            <li>{{ i18n.t('footer.platform.ocmImport') }}</li>
           </ul>
         </div>
         <div class="footer-col">
-          <h4>Полезно</h4>
+          <h4>{{ i18n.t('footer.useful') }}</h4>
           <ul>
-            <li>Разстояние до станция</li>
-            <li>Статус: активна / поддръжка</li>
-            <li>Връзка към Google Maps и Waze</li>
+            <li>{{ i18n.t('footer.useful.distance') }}</li>
+            <li>{{ i18n.t('footer.useful.status') }}</li>
+            <li>{{ i18n.t('footer.useful.mapsLinks') }}</li>
           </ul>
         </div>
       </div>
       <div class="footer-bottom">
-        <p class="footer-copy">&copy; 2026 eMobility EV Charging Platform. Всички права запазени.</p>
+        <p class="footer-copy">&copy; {{ i18n.t('footer.copy') }}</p>
       </div>
     </div>
   </footer>

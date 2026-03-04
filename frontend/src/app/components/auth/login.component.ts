@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { I18nService } from '../../services/i18n.service';
 
 @Component({
   selector: 'app-login',
@@ -38,7 +39,8 @@ export class LoginComponent {
   constructor(
     private auth: AuthService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    public i18n: I18nService
   ) {}
 
   setMode(m: 'login' | 'register'): void {
@@ -50,7 +52,7 @@ export class LoginComponent {
     this.error = null;
     if (this.mode === 'login') {
       if (!this.email.trim() || !this.password) {
-        this.error = 'Моля, въведете имейл и парола.';
+        this.error = this.i18n.t('auth.error.missingEmailPassword');
         return;
       }
       this.loading = true;
@@ -62,16 +64,19 @@ export class LoginComponent {
         },
         error: (err) => {
           this.loading = false;
-          this.error = err?.error?.error || err?.message || 'Грешка при вход. Проверете имейл и парола.';
+          this.error =
+            err?.error?.error ||
+            err?.message ||
+            this.i18n.t('auth.error.loginFailed');
         },
       });
     } else {
       if (!this.name.trim() || !this.email.trim() || !this.password) {
-        this.error = 'Моля, попълнете всички полета.';
+        this.error = this.i18n.t('auth.error.missingAllFields');
         return;
       }
       if (this.password.length < 6) {
-        this.error = 'Паролата трябва да е поне 6 символа.';
+        this.error = this.i18n.t('auth.error.passwordTooShort');
         return;
       }
       this.loading = true;
@@ -85,7 +90,10 @@ export class LoginComponent {
           },
           error: (err) => {
             this.loading = false;
-            this.error = err?.error?.error || err?.message || 'Грешка при регистрация.';
+            this.error =
+              err?.error?.error ||
+              err?.message ||
+              this.i18n.t('auth.error.registerFailed');
           },
         });
     }

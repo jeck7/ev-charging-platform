@@ -9,6 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { I18nService } from '../../services/i18n.service';
 import { StationImportService, ImportJobStatus, StationStats } from '../../services/station-import.service';
 import { StationCountryService } from '../../services/station-country.service';
 import { interval, Subscription } from 'rxjs';
@@ -56,7 +57,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   constructor(
     private importService: StationImportService,
     private stationCountry: StationCountryService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    public i18n: I18nService
   ) {}
 
   ngOnInit() {

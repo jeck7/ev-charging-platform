@@ -3,10 +3,18 @@
     <mat-card-header>
       <mat-card-title>
         <mat-icon>{{ mode === 'login' ? 'login' : 'person_add' }}</mat-icon>
-        {{ mode === 'login' ? 'Вход' : 'Регистрация' }}
+        {{
+          mode === 'login'
+            ? i18n.t('auth.login')
+            : i18n.t('auth.register')
+        }}
       </mat-card-title>
       <mat-card-subtitle>
-        {{ mode === 'login' ? 'Влезте в акаунта си' : 'Създайте акаунт' }}
+        {{
+          mode === 'login'
+            ? i18n.t('auth.login.subtitle')
+            : i18n.t('auth.register.subtitle')
+        }}
       </mat-card-subtitle>
     </mat-card-header>
     <mat-card-content>
@@ -16,18 +24,34 @@
         }
         @if (mode === 'register') {
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Име</mat-label>
+            <mat-label>{{ i18n.t('auth.name') }}</mat-label>
             <input matInput [(ngModel)]="name" name="name" required />
           </mat-form-field>
         }
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Имейл</mat-label>
+          <mat-label>{{ i18n.t('auth.email') }}</mat-label>
           <input matInput type="email" [(ngModel)]="email" name="email" required />
         </mat-form-field>
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>{{ mode === 'register' ? 'Парола (мин. 6 символа)' : 'Парола' }}</mat-label>
+          <mat-label>
+            {{
+              mode === 'register'
+                ? i18n.t('auth.passwordWithHint')
+                : i18n.t('auth.password')
+            }}
+          </mat-label>
           <input matInput [type]="hidePassword ? 'password' : 'text'" [(ngModel)]="password" name="password" required />
-          <button mat-icon-button matSuffix type="button" (click)="hidePassword = !hidePassword" [attr.aria-label]="hidePassword ? 'Покажи парола' : 'Скрий парола'">
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="hidePassword = !hidePassword"
+            [attr.aria-label]="
+              hidePassword
+                ? i18n.t('auth.showPassword')
+                : i18n.t('auth.hidePassword')
+            "
+          >
             <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
           </button>
         </mat-form-field>
@@ -36,11 +60,19 @@
             @if (loading) {
               <mat-spinner diameter="24"></mat-spinner>
             } @else {
-              {{ mode === 'login' ? 'Вход' : 'Регистрация' }}
+              {{
+                mode === 'login'
+                  ? i18n.t('auth.login')
+                  : i18n.t('auth.register')
+              }}
             }
           </button>
           <button type="button" class="link-btn" (click)="setMode(mode === 'login' ? 'register' : 'login')">
-            {{ mode === 'login' ? 'Нямате акаунт? Регистрирайте се' : 'Вече имате акаунт? Влезте' }}
+            {{
+              mode === 'login'
+                ? i18n.t('auth.noAccount')
+                : i18n.t('auth.haveAccount')
+            }}
           </button>
         </div>
       </form>
