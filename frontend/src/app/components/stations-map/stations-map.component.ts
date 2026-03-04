@@ -13,6 +13,7 @@ import { CommonModule } from '@angular/common';
 import type { ChargingStation } from '../../models/charging-station.model';
 import type { RoutePoint } from '../../data/highway-routes';
 import { environment } from '../../../environments/environment';
+import { I18nService } from '../../services/i18n.service';
 import * as L from 'leaflet';
 
 @Component({
@@ -65,7 +66,10 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
 
   readonly mapId = 'stations-map-' + Math.random().toString(36).slice(2);
 
-  constructor(private cdr: ChangeDetectorRef) {}
+  constructor(
+    private cdr: ChangeDetectorRef,
+    public i18n: I18nService
+  ) {}
 
   /** Избор на маршрут като основен по индекс (от бутоните) */
   selectRouteByIndex(i: number): void {
@@ -189,14 +193,18 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       this.userLocationMarker = null;
     }
     if (!this.userLocation) return;
+    const label = this.i18n.t('map.userLocation.here');
     const icon = L.divIcon({
       className: 'user-location-marker',
-      html: `<span title="Вие сте тук">📍</span>`,
+      html: `<span title="${label}">📍</span>`,
       iconSize: [32, 32],
       iconAnchor: [16, 32],
     });
-    this.userLocationMarker = L.marker([this.userLocation.lat, this.userLocation.lng], { icon })
-      .bindPopup('Вие сте тук', { className: 'user-location-popup' })
+    this.userLocationMarker = L.marker(
+      [this.userLocation.lat, this.userLocation.lng],
+      { icon }
+    )
+      .bindPopup(label, { className: 'user-location-popup' })
       .addTo(this.map);
   }
 
@@ -554,8 +562,11 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       iconSize: [20, 20],
       iconAnchor: [10, 10],
     });
-    this.routeStartMarker = L.marker([startLat, startLng], { icon: startIcon })
-      .bindPopup('Начало на маршрута')
+    const startLabel = this.i18n.t('map.route.start');
+    this.routeStartMarker = L.marker([startLat, startLng], {
+      icon: startIcon,
+    })
+      .bindPopup(startLabel)
       .addTo(this.map);
     
     // End marker (red circle)
@@ -565,8 +576,9 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
       iconSize: [20, 20],
       iconAnchor: [10, 10],
     });
+    const endLabel = this.i18n.t('map.route.end');
     this.routeEndMarker = L.marker([endLat, endLng], { icon: endIcon })
-      .bindPopup('Край на маршрута')
+      .bindPopup(endLabel)
       .addTo(this.map);
   }
 
@@ -662,24 +674,38 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
     }
   }
 
-  private createMarker(station: ChargingStation, isSelected: boolean = false): L.Marker {
+  private createMarker(
+    station: ChargingStation,
+    isSelected: boolean = false
+  ): L.Marker {
     const icon = this.getIconForStation(station, isSelected);
     const marker = L.marker([station.latitude!, station.longitude!], { icon });
     
     // Изчисли разстоянието ако има userLocation
     const distance = this.getStationDistance(station);
-    const distanceText = distance !== null ? `<p class="popup-distance">📍 ${this.formatDistance(distance)}</p>` : '';
+    const distanceText =
+      distance !== null
+        ? `<p class="popup-distance">📍 ${this.formatDistance(distance)}</p>`
+        : '';
     const priceHtml = this.formatPopupPrice(station);
+
+    const statusLabel = this.escapeHtml(this.getStatusLabel(station.status));
+    const statusHtml = statusLabel
+      ? `<p class="popup-status">${statusLabel}</p>`
+      : '';
+    const detailsLabel = this.escapeHtml(
+      this.i18n.t('map.popup.detailsLink')
+    );
 
     const popup = `
       <div class="station-popup">
         <strong>${this.escapeHtml(station.name)}</strong>
         <p class="popup-address">${this.escapeHtml(station.address || '')}</p>
         ${distanceText}
-        <p class="popup-status">${station.status}</p>
+        ${statusHtml}
         ${station.maxPowerKw ? `<p class="popup-power">${station.maxPowerKw} kW</p>` : ''}
         ${priceHtml}
-        <a href="/stations/${station.id}" class="popup-link">Виж детайли</a>
+        <a href="/stations/${station.id}" class="popup-link">${detailsLabel}</a>
       </div>
     `;
     marker.bindPopup(popup, { maxWidth: 280 });
@@ -722,10 +748,24 @@ export class StationsMapComponent implements AfterViewInit, OnChanges, OnDestroy
 
   /** Форматира цената за попъпа на картата (на локация или от конектор) */
   private formatPopupPrice(station: ChargingStation): string {
-    const cost = station.usageCost?.trim() ||
+    const cost =
+      station.usageCost?.trim() ||
       station.connectors?.find((c) => c.usageCost?.trim())?.usageCost?.trim();
     if (!cost) return '';
-    return `<p class="popup-price">Цена: ${this.escapeHtml(cost)}</p>`;
+    const prefix = this.escapeHtml(this.i18n.t('map.popup.pricePrefix'));
+    return `<p class="popup-price">${prefix}: ${this.escapeHtml(cost)}</p>`;
+  }
+
+  private getStatusLabel(status: string | null | undefined): string {
+    if (!status) return '';
+    const upper = status.toUpperCase();
+    if (upper === 'ACTIVE') {
+      return this.i18n.t('stationDetail.status.active');
+    }
+    if (upper === 'MAINTENANCE') {
+      return this.i18n.t('stationDetail.status.maintenance');
+    }
+    return status;
   }
 
   private escapeHtml(text: string): string {

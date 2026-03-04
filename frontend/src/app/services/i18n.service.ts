@@ -146,6 +146,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
       'Импортът се извършва автоматично всеки ден в 02:00 за България. Можете да стартирате ръчен импорт по всяко време.',
 
     // Station detail
+    // Station detail
     'stationDetail.back': 'Назад към станциите',
     'stationDetail.loading': 'Зареждане...',
     'stationDetail.errorNotFound': 'Станцията не е намерена',
@@ -163,6 +164,13 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'stationDetail.adminPanelLink': 'админ панела',
     'stationDetail.pricesHint':
       'Цените можете да попълните чрез „Обогатяване на цени (Chargeprice)“.',
+
+    // Map popups
+    'map.userLocation.here': 'Вие сте тук',
+    'map.route.start': 'Начало на маршрута',
+    'map.route.end': 'Край на маршрута',
+    'map.popup.pricePrefix': 'Цена',
+    'map.popup.detailsLink': 'Виж детайли',
   },
   en: {
     // App / nav
@@ -333,6 +341,13 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'stationDetail.adminPanelLink': 'admin panel',
     'stationDetail.pricesHint':
       'You can populate prices via “Enrich prices (Chargeprice)”.',
+
+    // Map popups
+    'map.userLocation.here': 'You are here',
+    'map.route.start': 'Route start',
+    'map.route.end': 'Route end',
+    'map.popup.pricePrefix': 'Price',
+    'map.popup.detailsLink': 'View details',
   },
 };
 

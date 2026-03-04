@@ -244,6 +244,18 @@ export class StationsListComponent implements OnInit, OnDestroy {
     });
   }
 
+  getStatusLabel(status: string | null | undefined): string {
+    if (!status) return '';
+    const upper = status.toUpperCase();
+    if (upper === 'ACTIVE') {
+      return this.i18n.t('stationDetail.status.active');
+    }
+    if (upper === 'MAINTENANCE') {
+      return this.i18n.t('stationDetail.status.maintenance');
+    }
+    return status;
+  }
+
   /** Разстояние в км (приблизително, Haversine) */
   private distanceKm(
     lat1: number,

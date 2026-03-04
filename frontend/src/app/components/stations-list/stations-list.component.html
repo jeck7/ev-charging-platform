@@ -236,7 +236,7 @@
                         class="status-badge"
                         [class.active]="station.status === 'ACTIVE'"
                       >
-                        {{ station.status }}
+                        {{ getStatusLabel(station.status) }}
                       </span>
                       @if (station.maxPowerKw) {
                         <span class="power-badge">{{ station.maxPowerKw }} kW</span>
@@ -263,7 +263,9 @@
                       class="view-detail-link"
                       (click)="$event.stopPropagation()"
                     >
-                      <span class="view-detail">Детайли</span>
+                      <span class="view-detail">
+                        {{ i18n.t('map.popup.detailsLink') }}
+                      </span>
                       <mat-icon>arrow_forward</mat-icon>
                     </a>
                   </mat-card-actions>
