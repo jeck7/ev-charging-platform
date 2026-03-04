@@ -144,6 +144,25 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
       'Обогати цени за {{country}}',
     'admin.info.text':
       'Импортът се извършва автоматично всеки ден в 02:00 за България. Можете да стартирате ръчен импорт по всяко време.',
+
+    // Station detail
+    'stationDetail.back': 'Назад към станциите',
+    'stationDetail.loading': 'Зареждане...',
+    'stationDetail.errorNotFound': 'Станцията не е намерена',
+    'stationDetail.status.active': 'Активна',
+    'stationDetail.status.maintenance': 'Поддръжка',
+    'stationDetail.howToGetThere': 'Как да стигна',
+    'stationDetail.connectorsTitle':
+      'На локацията има следните зарядни станции',
+    'stationDetail.groupTitlePrefix': 'Станция',
+    'stationDetail.connectorDescription':
+      ' конектор с максимална мощност {{power}} kW',
+    'stationDetail.pricePrefix': 'и цена',
+    'stationDetail.noConnectors':
+      'Няма въведени данни за конектори за тази станция.',
+    'stationDetail.adminPanelLink': 'админ панела',
+    'stationDetail.pricesHint':
+      'Цените можете да попълните чрез „Обогатяване на цени (Chargeprice)“.',
   },
   en: {
     // App / nav
@@ -295,6 +314,25 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
       'Enrich prices for {{country}}',
     'admin.info.text':
       'Import runs automatically every day at 02:00 for Bulgaria. You can start a manual import at any time.',
+
+    // Station detail
+    'stationDetail.back': 'Back to stations',
+    'stationDetail.loading': 'Loading...',
+    'stationDetail.errorNotFound': 'Station not found',
+    'stationDetail.status.active': 'Active',
+    'stationDetail.status.maintenance': 'Maintenance',
+    'stationDetail.howToGetThere': 'How to get there',
+    'stationDetail.connectorsTitle':
+      'The location has the following charging points',
+    'stationDetail.groupTitlePrefix': 'Charger',
+    'stationDetail.connectorDescription':
+      ' connector with maximum power {{power}} kW',
+    'stationDetail.pricePrefix': 'and price',
+    'stationDetail.noConnectors':
+      'No connector data is available for this station.',
+    'stationDetail.adminPanelLink': 'admin panel',
+    'stationDetail.pricesHint':
+      'You can populate prices via “Enrich prices (Chargeprice)”.',
   },
 };
 

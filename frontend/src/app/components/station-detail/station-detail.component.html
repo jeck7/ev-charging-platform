@@ -1,19 +1,19 @@
 <div class="detail-container">
   <button mat-stroked-button routerLink="/" class="back-button">
     <mat-icon>arrow_back</mat-icon>
-    Назад към станциите
+    {{ i18n.t('stationDetail.back') }}
   </button>
 
   @if (loading) {
     <div class="loading">
       <mat-spinner diameter="40"></mat-spinner>
-      <span>Зареждане...</span>
+      <span>{{ i18n.t('stationDetail.loading') }}</span>
     </div>
   } @else if (error || !station) {
     <mat-card class="error-card">
       <mat-card-content>
         <mat-icon color="warn">error_outline</mat-icon>
-        <p>{{ error || 'Станцията не е намерена' }}</p>
+        <p>{{ error || i18n.t('stationDetail.errorNotFound') }}</p>
       </mat-card-content>
     </mat-card>
   } @else {
@@ -29,7 +29,7 @@
           </mat-card-title>
           <mat-card-subtitle>
             <span class="status-badge" [class.active]="station.status === 'ACTIVE'">
-              {{ station.status === 'ACTIVE' ? 'Активна' : station.status === 'MAINTENANCE' ? 'Поддръжка' : station.status }}
+              {{ getStatusLabel(station.status) }}
             </span>
             @if (station.operator && station.operator !== 'Fines Charging') {
               <span class="operator-badge">{{ station.operator }}</span>
@@ -44,7 +44,7 @@
 
           @if (station.latitude != null && station.longitude != null) {
             <section class="nav-section">
-              <h3 class="nav-heading">Как да стигна</h3>
+              <h3 class="nav-heading">{{ i18n.t('stationDetail.howToGetThere') }}</h3>
               <div class="nav-links">
                 <a
                   mat-stroked-button
@@ -71,20 +71,31 @@
           }
 
           <section class="connectors-section">
-            <h3 class="connectors-heading">На локацията има следните зарядни станции</h3>
+            <h3 class="connectors-heading">
+              {{ i18n.t('stationDetail.connectorsTitle') }}
+            </h3>
             @if (station.connectors && station.connectors.length > 0) {
               @for (group of getConnectorGroups(); track $index) {
                 @if (group.stationName) {
-                  <h4 class="station-group-title">Станция {{ group.stationName }}</h4>
+                  <h4 class="station-group-title">
+                    {{ i18n.t('stationDetail.groupTitlePrefix') }}
+                    {{ group.stationName }}
+                  </h4>
                 }
                 <ul class="connectors-list">
                   @for (conn of group.connectors; track $index) {
                     <li class="connector-item">
                       <app-connector-icon [type]="conn.type" />
                       <span class="connector-text">
-                        <strong>{{ conn.type }}</strong> конектор с максимална мощност <strong>{{ conn.powerKw }} kW</strong>
+                        <strong>{{ conn.type }}</strong>
+                        {{
+                          i18n.t('stationDetail.connectorDescription', {
+                            power: conn.powerKw,
+                          })
+                        }}
                         @if (conn.usageCost || station.usageCost) {
-                          и цена {{ conn.usageCost ?? station.usageCost }}
+                          {{ i18n.t('stationDetail.pricePrefix') }}
+                          {{ conn.usageCost ?? station.usageCost }}
                         }
                       </span>
                     </li>
@@ -93,7 +104,8 @@
               }
             } @else {
               <p class="connectors-empty">
-                Няма въведени данни за конектори за тази станция. Данните се попълват при импорт от Open Charge Map или Fines — импортирайте станциите от <a routerLink="/admin">админ панела</a>. Цените можете да попълните чрез «Обогатяване на цени (Chargeprice)».
+                {{ i18n.t('stationDetail.noConnectors') }}
+                {{ i18n.t('stationDetail.pricesHint') }}
               </p>
             }
           </section>

@@ -8,6 +8,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { StationService } from '../../services/station.service';
 import { ChargingStation, ConnectorInfo } from '../../models/charging-station.model';
 import { ConnectorIconComponent } from '../connector-icon/connector-icon.component';
+import { I18nService } from '../../services/i18n.service';
 import * as L from 'leaflet';
 
 interface ConnectorGroup {
@@ -41,7 +42,8 @@ export class StationDetailComponent implements OnInit, AfterViewInit {
 
   constructor(
     private route: ActivatedRoute,
-    private stationService: StationService
+    private stationService: StationService,
+    public i18n: I18nService
   ) {}
 
   ngOnInit(): void {
@@ -54,7 +56,7 @@ export class StationDetailComponent implements OnInit, AfterViewInit {
         setTimeout(() => this.initMap(), 0);
       },
       error: () => {
-        this.error = 'Station not found';
+        this.error = this.i18n.t('stationDetail.errorNotFound');
         this.loading = false;
       },
     });
@@ -120,6 +122,17 @@ export class StationDetailComponent implements OnInit, AfterViewInit {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  getStatusLabel(status: string | null | undefined): string {
+    if (!status) return '';
+    if (status === 'ACTIVE') {
+      return this.i18n.t('stationDetail.status.active');
+    }
+    if (status === 'MAINTENANCE') {
+      return this.i18n.t('stationDetail.status.maintenance');
+    }
+    return status;
   }
 
   /**
