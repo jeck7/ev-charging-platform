@@ -47,7 +47,7 @@ Key Features:
 ### 1. Setup mTLS Certificates
 
 ```bash
-cd /Users/hristo/Desktop/ev-charging-platform
+cd ev-charging-platform
 ./scripts/setup-mtls.sh
 ```
 
