@@ -1,5 +1,5 @@
 🤖 **Статистика за проекта:**
-![Посещения](https://seeyoufarm.com)
+![Посещения]([https://seeyoufarm.com](https://camo.githubusercontent.com/8ff8bbbbbcfa2a3034a1d67adfdf687b105df38aaebf102ad09a78f761453d3a/68747470733a2f2f736565796f756661726d2e636f6d))
 ![Клонирания](https://shields.io)
 
 
