@@ -8,6 +8,9 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    # ТОВА ДАВА НУЖНИТЕ ПРАВА ЗА СТАТИСТИКАТА:
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
