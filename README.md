@@ -1,6 +1,5 @@
-🤖 **Статистика за проекта:** 
-![Посещения](https://seeyoufarm.com/badge/counter.svg?page_id=jeck7.ev-charging-platform&left_color=black&right_color=green&type=responsive) 
-![Разклонения](https://img.shields.io/github/forks/jeck7.ev-charging-platform?style=social)
+🤖 **Статистика за проекта:** ![Посещения](https://komarev.com/ghpvc/?username=jeck7&repo=ev-charging-platform&color=green) ![Разклонения](https://img.shields.io/github/forks/jeck7/ev-charging-platform?style=social)
+
 
 
 📈 eMobility EV Charging Platform  
