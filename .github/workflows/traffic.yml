@@ -1,0 +1,18 @@
+name: GitHub Traffic Badges
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Fetch Traffic Data
+        uses: yi-Ji/repo-traffic-badge@v1.0.0
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
