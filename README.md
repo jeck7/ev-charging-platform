@@ -1,3 +1,9 @@
+🤖 **Трафик статистика за проекта:**
+![Посещения](https://shields.io)
+![Клонирания](https://shields.io)
+
+
+
 📈 eMobility EV Charging Platform  
 Live: (self-hosted / private deployments)
 
