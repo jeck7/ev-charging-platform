@@ -1,1 +1,20 @@
 
+name: GitHub Clone Count Update
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Изпълнява се всеки ден в полунощ
+  workflow_dispatch: # Позволява ти да го пуснеш и ръчно
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: gh-counters
+        uses: lowlighter/metrics@latest
+        with:
+          token: ${{ secrets.METRICS_TOKEN }}
+          base: ""
+          plugin_traffic: yes
